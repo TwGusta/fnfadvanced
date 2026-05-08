@@ -160,6 +160,14 @@
         .tutorial-text { font-size: 20px; color: var(--fnf-cyan); margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
         .tutorial-nav { display: flex; justify-content: space-between; gap: 10px; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; order: 2; flex: 1; border-right: none; border-top: 3px solid var(--fnf-border); box-shadow: 0 -4px 30px rgba(139,19,240,0.3); }
+            .preview-area { height: 40vh; flex: none; order: 1; padding: 10px; }
+            .modal-content { width: 95%; max-width: none; padding: 15px; }
+            #test-prompt-text { min-width: 90%; font-size: 16px; }
+        }
     </style>
 
 </head>
@@ -1171,14 +1179,17 @@
                     const h = document.createElement('div');
                     h.className = `handle ${dir}`;
                     h.style.transform = `scale(${1 / currentScale})`;
-                    h.onmousedown = (e) => {
-                        e.stopPropagation(); dragMode = dir; dragIndex = idx;
-                        startX = e.clientX; startY = e.clientY;
+                    const handleStart = (e) => {
+                        if(e.cancelable && e.type === "touchstart") e.preventDefault(); e.stopPropagation(); dragMode = dir; dragIndex = idx;
+                        startX = e.touches ? e.touches[0].clientX : e.clientX; startY = e.touches ? e.touches[0].clientY : e.clientY;
                         origScaleX = data.scale.x; origScaleY = data.scale.y;
                         document.body.classList.add('dragging');
                         playStretchSound('start');
                         document.onmousemove = onHandleMove; document.onmouseup = stopDrag;
+                        document.ontouchmove = onHandleMove; document.ontouchend = stopDrag;
                     };
+                    h.onmousedown = handleStart;
+                    h.ontouchstart = handleStart;
                     el.appendChild(h);
                 });
 
@@ -1189,13 +1200,35 @@
                     showContextMenu(e, idx);
                 };
 
-                el.onmousedown = (e) => {
-                    if (isTesting) return; e.preventDefault(); selectObject(idx);
-                    dragMode = "move"; dragIndex = idx; startX = e.clientX; startY = e.clientY;
+                const elDragStart = (e) => {
+                    if (isTesting || e.button === 2) return; 
+                    if(e.cancelable && e.type === "touchstart") e.preventDefault(); 
+                    selectObject(idx);
+                    dragMode = "move"; dragIndex = idx; 
+                    startX = e.touches ? e.touches[0].clientX : e.clientX; 
+                    startY = e.touches ? e.touches[0].clientY : e.clientY;
                     origPosX = data.pos.x; origPosY = data.pos.y;
                     document.body.classList.add('dragging');
                     document.onmousemove = onDrag; document.onmouseup = stopDrag;
+                    document.ontouchmove = onDrag; document.ontouchend = stopDrag;
                 };
+                el.onmousedown = elDragStart;
+
+                let pressTimer;
+                el.ontouchstart = (e) => {
+                    if (e.touches.length > 1) return;
+                    pressTimer = setTimeout(() => {
+                        if (isTesting) return;
+                        selectObject(idx);
+                        const touch = e.touches[0];
+                        showContextMenu({clientX: touch.clientX, clientY: touch.clientY, preventDefault:()=>{}}, idx);
+                        stopDrag(); 
+                    }, 600);
+                    elDragStart(e);
+                };
+                el.ontouchend = () => clearTimeout(pressTimer);
+                el.ontouchcancel = () => clearTimeout(pressTimer);
+                el.addEventListener('touchmove', () => clearTimeout(pressTimer), {passive: true});
 
                 let fileObj = uploadedFiles[data.path];
                 let baseW = 150, baseH = 150, frameX = 0, frameY = 0, sprW = 150, sprH = 150;
@@ -1372,8 +1405,11 @@
         }
 
         function onDrag(e) {
+            if(e.cancelable && e.type === "touchmove") e.preventDefault();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             const screen = document.getElementById('preview-screen'); const rect = screen.getBoundingClientRect();
-            let dx = (e.clientX - startX) / rect.width; let dy = (e.clientY - startY) / rect.height;
+            let dx = (clientX - startX) / rect.width; let dy = (clientY - startY) / rect.height;
             
             let rawX = origPosX + dx;
             let rawY = origPosY + dy;
@@ -1438,8 +1474,11 @@
         }
 
         function onHandleMove(e) {
-            let dx = (e.clientX - startX) * (0.005 / currentScale);
-            let dy = (e.clientY - startY) * (0.005 / currentScale);
+            if(e.cancelable && e.type === "touchmove") e.preventDefault();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            let dx = (clientX - startX) * (0.005 / currentScale);
+            let dy = (clientY - startY) * (0.005 / currentScale);
             if (dragMode === 'n' || dragMode === 's') imagesData[dragIndex].scale.y = Math.max(0.1, Math.round((origScaleY + (dragMode === 'n' ? -dy : dy)) * 100) / 100);
             if (dragMode === 'e' || dragMode === 'w') imagesData[dragIndex].scale.x = Math.max(0.1, Math.round((origScaleX + (dragMode === 'w' ? -dx : dx)) * 100) / 100);
             if (dragMode === 'se') {
@@ -1456,6 +1495,8 @@
             }
             document.onmousemove = null;
             document.onmouseup = null;
+            document.ontouchmove = null;
+            document.ontouchend = null;
             document.body.classList.remove('dragging');
             const gh = document.getElementById('guide-h');
             const gv = document.getElementById('guide-v');
