@@ -208,27 +208,32 @@
             .preview-element { touch-action: none; }
 
             /* 3. Conteúdo da sidebar embaixo, rolável */
-            .sidebar-content {
+            .sidebar-content-wrapper {
                 order: 4;
                 flex: 1;
+                position: relative;
+                width: 100%;
+            }
+            .sidebar-content {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
                 width: 100%;
                 overflow-y: auto;
                 overflow-x: hidden;
                 background: var(--fnf-panel);
                 -webkit-overflow-scrolling: touch;
                 border-top: 3px solid var(--fnf-border);
-                transition: all 0.3s ease;
+                transition: top 0.4s cubic-bezier(0.1, 0.9, 0.2, 1);
+                z-index: 100;
             }
             .sidebar-content.expanded {
-                position: absolute;
-                top: 15vh;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                z-index: 100;
-                box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
+                top: -38vh;
                 border-radius: 15px 15px 0 0;
                 border-top: 4px solid var(--fnf-border);
+                box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
             }
             .mobile-handle-wrapper {
                 display: flex;
@@ -284,23 +289,25 @@
             <button class="btn-secondary" style="padding:0 8px; font-size:16px;" onclick="redo()" id="btn-redo" title="Refazer" disabled style="opacity:0.5;">↪</button>
         </div>
 
-        <div class="sidebar-content" id="sidebar-content">
-            <div class="mobile-handle-wrapper" id="mobile-handle">
-                <div class="mobile-handle"></div>
-            </div>
-            <div class="section-title" data-i18n="settings_title">Config. Globais</div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label data-i18n="bg_color">Cor de Fundo (HEX)</label>
-                    <input type="text" id="glob-bgColor" value="0xFFFFFFFF" oninput="updatePreview()" onchange="saveProject()">
+        <div class="sidebar-content-wrapper">
+            <div class="sidebar-content" id="sidebar-content">
+                <div class="mobile-handle-wrapper" id="mobile-handle">
+                    <div class="mobile-handle"></div>
                 </div>
-            </div>
+                <div class="section-title" data-i18n="settings_title">Config. Globais</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-i18n="bg_color">Cor de Fundo (HEX)</label>
+                        <input type="text" id="glob-bgColor" value="0xFFFFFFFF" oninput="updatePreview()" onchange="saveProject()">
+                    </div>
+                </div>
 
-            <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
-                <span data-i18n="objects_title">Objetos na Tela</span>
-                <button class="btn btn-primary" style="font-size: 16px; padding: 4px 10px; border-width: 2px;" data-i18n="new_object" onclick="addImage()">+ NOVO OBJETO</button>
+                <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span data-i18n="objects_title">Objetos na Tela</span>
+                    <button class="btn btn-primary" style="font-size: 16px; padding: 4px 10px; border-width: 2px;" data-i18n="new_object" onclick="addImage()">+ NOVO OBJETO</button>
+                </div>
+                <div id="images-container"></div>
             </div>
-            <div id="images-container"></div>
         </div>
     </div>
 
