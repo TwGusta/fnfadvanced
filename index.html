@@ -105,8 +105,8 @@
         .handle.w { left: -6px; top: calc(50% - 6px); cursor: ew-resize; }
         .handle.se { bottom: -8px; right: -8px; cursor: nwse-resize; background: var(--fnf-yellow); width: 16px; height: 16px; }
 
-        .sprite-container { position: relative; width: 100%; height: 100%; overflow: hidden; transform-origin: center center; }
-        .sprite-layer { position: absolute; background-repeat: no-repeat; background-size: auto; }
+        .sprite-container { position: relative; width: 100%; height: 100%; overflow: hidden; transform-origin: center center; pointer-events: none; }
+        .sprite-layer { position: absolute; background-repeat: no-repeat; background-size: auto; pointer-events: none; }
 
         .tab-btn { background: rgba(139,19,240,0.1); border: 2px solid rgba(139,19,240,0.3); color: var(--fnf-dim); padding: 7px 8px; font-size: 15px; font-family: 'VT323', monospace; cursor: pointer; border-radius: 0; flex: 1; text-transform: uppercase; letter-spacing: 1px; transition: all 0.15s; }
         .tab-btn:hover { border-color: var(--fnf-border); color: white; }
@@ -161,6 +161,7 @@
         .tutorial-text { font-size: 20px; color: var(--fnf-cyan); margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
         .tutorial-nav { display: flex; justify-content: space-between; gap: 10px; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .mobile-handle { display: none; }
 
         @media (max-width: 768px) {
             body {
@@ -186,10 +187,17 @@
             .sidebar-header p { font-size: 11px !important; }
             .sidebar-header img[style*="height:44px"] { height: 28px !important; }
 
+            /* Ações no topo */
+            .top-actions-bar {
+                order: 2;
+                width: 100%;
+                flex-shrink: 0;
+            }
+
             /* 2. Preview logo abaixo do cabeçalho */
             .preview-area {
-                order: 2;
-                height: 42vh;
+                order: 3;
+                height: 38vh;
                 flex: none;
                 padding: 4px;
                 border-right: none;
@@ -201,13 +209,34 @@
 
             /* 3. Conteúdo da sidebar embaixo, rolável */
             .sidebar-content {
-                order: 3;
+                order: 4;
                 flex: 1;
                 width: 100%;
                 overflow-y: auto;
                 overflow-x: hidden;
                 background: var(--fnf-panel);
                 -webkit-overflow-scrolling: touch;
+                border-top: 3px solid var(--fnf-border);
+                transition: all 0.3s ease;
+            }
+            .sidebar-content.expanded {
+                position: absolute;
+                top: 15vh;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 100;
+                box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
+                border-radius: 15px 15px 0 0;
+                border-top: 4px solid var(--fnf-border);
+            }
+            .mobile-handle {
+                display: block;
+                width: 40px;
+                height: 6px;
+                background: rgba(255,255,255,0.4);
+                border-radius: 5px;
+                margin: 0 auto 15px auto;
             }
 
             /* Modais e outros */
@@ -237,14 +266,16 @@
             </div>
         </div>
 
-        <div style="padding: 12px 16px; display: flex; gap: 8px; background: rgba(0,0,0,0.3); border-bottom: 2px solid rgba(139,19,240,0.3);">
-            <button class="btn btn-primary" style="flex:1" data-i18n="new_object" onclick="addImage()">+ NOVO OBJETO</button>
-            <button class="btn btn-accent" style="flex:1" data-i18n="test" onclick="startTest()">► TESTAR</button>
-            <button class="btn btn-secondary" style="padding:0 8px; font-size:16px;" onclick="undo()" id="btn-undo" title="Desfazer" disabled style="opacity:0.5;">↩</button>
-            <button class="btn btn-secondary" style="padding:0 8px; font-size:16px;" onclick="redo()" id="btn-redo" title="Refazer" disabled style="opacity:0.5;">↪</button>
+        <div class="top-actions-bar" style="padding: 10px 16px; display: flex; gap: 6px; background: rgba(0,0,0,0.3); border-bottom: 2px solid rgba(139,19,240,0.3);">
+            <button class="btn btn-accent" style="flex:1; font-size:16px; padding:6px;" data-i18n="test" onclick="startTest()">► TESTAR</button>
+            <button class="btn-secondary" style="flex:1; font-size:16px; padding:6px;" data-i18n="reset" onclick="resetProject()">↺ RESETAR</button>
+            <button class="btn btn-success" style="flex:1; font-size:16px; padding:6px;" data-i18n="export" onclick="openExportTutorial()">↓ EXPORT</button>
+            <button class="btn-secondary" style="padding:0 8px; font-size:16px;" onclick="undo()" id="btn-undo" title="Desfazer" disabled style="opacity:0.5;">↩</button>
+            <button class="btn-secondary" style="padding:0 8px; font-size:16px;" onclick="redo()" id="btn-redo" title="Refazer" disabled style="opacity:0.5;">↪</button>
         </div>
 
-        <div class="sidebar-content">
+        <div class="sidebar-content" id="sidebar-content">
+            <div class="mobile-handle" id="mobile-handle" onclick="document.getElementById('sidebar-content').classList.toggle('expanded')"></div>
             <div class="section-title" data-i18n="settings_title">Config. Globais</div>
             <div class="form-row">
                 <div class="form-group">
@@ -253,13 +284,11 @@
                 </div>
             </div>
 
-            <div class="section-title" data-i18n="objects_title">Objetos na Tela</div>
+            <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+                <span data-i18n="objects_title">Objetos na Tela</span>
+                <button class="btn btn-primary" style="font-size: 16px; padding: 4px 10px; border-width: 2px;" data-i18n="new_object" onclick="addImage()">+ NOVO OBJETO</button>
+            </div>
             <div id="images-container"></div>
-        </div>
-
-        <div style="padding:12px 16px; background: rgba(0,0,0,0.4); border-top: 3px solid var(--fnf-border); display:flex; gap:8px;">
-            <button class="btn-secondary" style="flex:1" data-i18n="reset" onclick="resetProject()">↺ RESETAR</button>
-            <button class="btn btn-success" style="flex:2" data-i18n="export" onclick="openExportTutorial()">↓ EXPORTAR MOD (ZIP)</button>
         </div>
     </div>
 
