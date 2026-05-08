@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Advanced Custom Title - Web Editor</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
@@ -162,18 +163,57 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         @media (max-width: 768px) {
-            body { flex-direction: column; overflow: hidden; }
+            body {
+                flex-direction: column;
+                overflow: hidden;
+                height: 100dvh;
+            }
+
+            /* sidebar vira um display:contents para que filhos sejam colocados no body diretamente */
             .sidebar { display: contents; }
-            .sidebar-header { order: 1; padding: 10px; border-bottom: 2px solid var(--fnf-border); width: 100%; z-index: 10; background: linear-gradient(135deg, #1a0035 0%, #2d0060 50%, #1a0035 100%); }
-            .sidebar-header h1 { font-size: 20px !important; }
-            .sidebar-header p { font-size: 12px !important; }
-            .sidebar-header img { height: 32px !important; }
-            .sidebar-header a img { height: 32px !important; width: 32px !important; }
-            .preview-area { height: 45vh; flex: none; order: 2; padding: 0; touch-action: none; z-index: 5; overflow: hidden; border-bottom: 3px solid var(--fnf-border); }
-            .sidebar-content { order: 3; flex: 1; overflow-y: auto; background: var(--fnf-panel); padding: 10px; width: 100%; z-index: 10; box-shadow: 0 -4px 20px rgba(0,0,0,0.5); }
-            .modal-content { width: 95%; max-width: none; padding: 15px; }
-            #test-prompt-text { min-width: 90%; font-size: 16px; }
+
+            /* 1. Cabeçalho no topo */
+            .sidebar-header {
+                order: 1;
+                width: 100%;
+                padding: 8px 12px;
+                background: linear-gradient(135deg, #1a0035, #2d0060, #1a0035);
+                border-bottom: 2px solid var(--fnf-border);
+                border-right: none;
+                flex-shrink: 0;
+            }
+            .sidebar-header h1 { font-size: 16px !important; letter-spacing: 1px !important; }
+            .sidebar-header p { font-size: 11px !important; }
+            .sidebar-header img[style*="height:44px"] { height: 28px !important; }
+
+            /* 2. Preview logo abaixo do cabeçalho */
+            .preview-area {
+                order: 2;
+                height: 42vh;
+                flex: none;
+                padding: 4px;
+                border-right: none;
+                border-bottom: 3px solid var(--fnf-border);
+                touch-action: none;
+            }
+            #preview-screen { touch-action: none; }
             .preview-element { touch-action: none; }
+
+            /* 3. Conteúdo da sidebar embaixo, rolável */
+            .sidebar-content {
+                order: 3;
+                flex: 1;
+                width: 100%;
+                overflow-y: auto;
+                overflow-x: hidden;
+                background: var(--fnf-panel);
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Modais e outros */
+            .modal-content { width: 95%; max-width: none; padding: 15px; }
+            .modal-overlay { align-items: flex-start; padding-top: 10px; }
+            #test-prompt-text { min-width: 90%; font-size: 16px; }
         }
     </style>
 
