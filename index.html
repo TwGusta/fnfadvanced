@@ -1,0 +1,1982 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Advanced Custom Title - Web Editor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --fnf-bg: #12041e;
+            --fnf-panel: #1a0830;
+            --fnf-border: #8B13F0;
+            --fnf-accent: #FF2D78;
+            --fnf-cyan: #00F5D4;
+            --fnf-yellow: #FFD60A;
+            --fnf-text: #ffffff;
+            --fnf-dim: rgba(255,255,255,0.5);
+            --fnf-glow: 0 0 8px #8B13F0, 0 0 20px rgba(139,19,240,0.4);
+            --fnf-glow-pink: 0 0 8px #FF2D78, 0 0 20px rgba(255,45,120,0.4);
+        }
+        * { box-sizing: border-box; font-family: 'VT323', 'Courier New', monospace; cursor: url('ui/cursor-default.png') 0 0, auto; }
+        body {
+            margin: 0; background-color: var(--fnf-bg);
+            background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(139,19,240,0.03) 2px, rgba(139,19,240,0.03) 4px), radial-gradient(ellipse at 20% 50%, rgba(139,19,240,0.15) 0%, transparent 60%), radial-gradient(ellipse at 80% 50%, rgba(255,45,120,0.1) 0%, transparent 60%);
+            color: var(--fnf-text); display: flex; height: 100vh; overflow: hidden;
+        }
+        body.dragging, body.dragging * { cursor: url('ui/cursor-grabbing.png') 8 8, grabbing !important; }
+        body.testing-mode .sidebar { filter: blur(8px); pointer-events: none; opacity: 0.3; }
+        body.testing-mode .preview-area { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; background: rgba(0,0,0,0.85); }
+        .preview-element:hover { cursor: url('ui/cursorGrab.png') 8 8, pointer; }
+        .smart-guide { position: absolute; background-color: var(--fnf-cyan); box-shadow: 0 0 5px var(--fnf-cyan); z-index: 10000; pointer-events: none; display: none; }
+        .smart-guide.h { height: 1px; width: 100%; left: 0; }
+        .smart-guide.v { width: 1px; height: 100%; top: 0; }
+        button, select, summary, .handle, .tab-btn, a { cursor: url('ui/cursor-pointer.png') 8 8, pointer !important; }
+
+        .sidebar { width: 420px; background: var(--fnf-panel); border-right: 3px solid var(--fnf-border); box-shadow: 4px 0 0 #000, 6px 0 30px rgba(139,19,240,0.3); display: flex; flex-direction: column; z-index: 100; flex-shrink: 0; }
+        .sidebar-header { padding: 16px 20px 14px; background: linear-gradient(135deg, #1a0035 0%, #2d0060 50%, #1a0035 100%); border-bottom: 3px solid var(--fnf-border); text-align: center; position: relative; overflow: hidden; }
+        .sidebar-header h1 { margin: 0; font-size: 28px; letter-spacing: 3px; color: var(--fnf-text); text-shadow: var(--fnf-glow); }
+        .sidebar-header p { margin: 2px 0 0; font-size: 16px; color: var(--fnf-cyan); opacity: 0.8; letter-spacing: 2px; }
+        .sidebar-content { flex: 1; overflow-y: auto; padding: 16px; }
+        .sidebar-content::-webkit-scrollbar { width: 6px; }
+        .sidebar-content::-webkit-scrollbar-track { background: #0a001a; }
+        .sidebar-content::-webkit-scrollbar-thumb { background: var(--fnf-border); }
+        .section-title { font-size: 20px; letter-spacing: 2px; margin: 20px 0 10px 0; color: var(--fnf-yellow); text-shadow: 0 0 8px var(--fnf-yellow); text-transform: uppercase; border-bottom: 2px solid var(--fnf-yellow); padding-bottom: 4px; }
+
+        .image-card { background: rgba(139,19,240,0.08); border: 2px solid rgba(139,19,240,0.3); border-radius: 0; padding: 12px; margin-bottom: 10px; transition: border-color 0.15s, background 0.15s; cursor: url('ui/cursor-pointer.png') 8 8, pointer; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+        .image-card:hover { background: rgba(139,19,240,0.18); border-color: var(--fnf-border); }
+        .image-card.selected { background: rgba(255,45,120,0.1); border-color: var(--fnf-accent); box-shadow: var(--fnf-glow-pink); }
+        .image-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+
+        .form-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-end; width: 100%; }
+        .form-group { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .form-group label { font-size: 14px; margin-bottom: 2px; color: var(--fnf-cyan); letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        input, select { background: #0a001a; border: 2px solid rgba(139,19,240,0.4); color: var(--fnf-text); padding: 6px 8px; border-radius: 0; font-size: 16px; font-family: 'VT323', monospace; width: 100%; min-width: 0; outline: none; transition: border-color 0.15s; }
+        input:focus, select:focus { border-color: var(--fnf-accent); box-shadow: var(--fnf-glow-pink); }
+        select option { background: #1a0830; }
+        input[type="checkbox"] { 
+            appearance: none; -webkit-appearance: none;
+            width: 30px; height: 30px;
+            background: transparent !important;
+            border: none !important; box-shadow: none !important;
+            cursor: url('ui/cursor-pointer.png') 8 8, pointer;
+            position: relative;
+            vertical-align: middle;
+            margin-top: 4px;
+        }
+        input[type="checkbox"]::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 30px; height: 30px;
+            background-image: url('images/icons/checkboxThingie.png');
+            background-repeat: no-repeat;
+            background-position: -78px 0px; 
+            background-size: 151px; 
+            image-rendering: pixelated;
+            pointer-events: none;
+        }
+        input[type="checkbox"]:checked::after {
+            background-position: 0px -58px; 
+            width: 35px; height: 51px;
+            top: -21px; left: -2px;
+            animation: checkFNF 0.15s steps(1) forwards;
+        }
+        @keyframes checkFNF {
+            0% { background-position: -109px 0px; width: 35px; height: 24px; top: 6px; left: -2px; }
+            33% { background-position: -76px -55px; width: 40px; height: 43px; top: -13px; left: -2px; }
+            66% { background-position: -39px -55px; width: 35px; height: 52px; top: -22px; left: -2px; }
+            100% { background-position: 0px -58px; width: 35px; height: 51px; top: -21px; left: -2px; }
+        }
+
+        .preview-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #070010; background-image: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(139,19,240,0.04) 3px, rgba(139,19,240,0.04) 4px); position: relative; padding: 40px; overflow: hidden; }
+        .preview-wrapper { position: relative; box-shadow: 0 0 0 3px var(--fnf-border), 0 0 0 5px #000, 0 0 40px rgba(139,19,240,0.5); transform-origin: center center; background: #000; }
+        #preview-screen { width: 1280px; height: 720px; position: relative; overflow: hidden; }
+        .preview-element { position: absolute; cursor: url('ui/cursorGrab.png') 8 8, move; user-select: none; }
+        .preview-element.selected { outline: 2px dashed var(--fnf-accent); }
+
+        .handle { position: absolute; background: var(--fnf-accent); border: 2px solid #000; width: 12px; height: 12px; border-radius: 0; display: none; z-index: 100; }
+        .preview-element.selected .handle { display: block; }
+        .handle.n { top: -6px; left: calc(50% - 6px); cursor: ns-resize; }
+        .handle.s { bottom: -6px; left: calc(50% - 6px); cursor: ns-resize; }
+        .handle.e { right: -6px; top: calc(50% - 6px); cursor: ew-resize; }
+        .handle.w { left: -6px; top: calc(50% - 6px); cursor: ew-resize; }
+        .handle.se { bottom: -8px; right: -8px; cursor: nwse-resize; background: var(--fnf-yellow); width: 16px; height: 16px; }
+
+        .sprite-container { position: relative; width: 100%; height: 100%; overflow: hidden; transform-origin: center center; }
+        .sprite-layer { position: absolute; background-repeat: no-repeat; background-size: auto; }
+
+        .tab-btn { background: rgba(139,19,240,0.1); border: 2px solid rgba(139,19,240,0.3); color: var(--fnf-dim); padding: 7px 8px; font-size: 15px; font-family: 'VT323', monospace; cursor: pointer; border-radius: 0; flex: 1; text-transform: uppercase; letter-spacing: 1px; transition: all 0.15s; }
+        .tab-btn:hover { border-color: var(--fnf-border); color: white; }
+        .tab-btn.active { background: var(--fnf-border); color: white; box-shadow: var(--fnf-glow); }
+
+        details.anim-accordion { background: rgba(0,0,0,0.3); border: 2px solid rgba(139,19,240,0.25); border-left: 4px solid var(--fnf-border); border-radius: 0; margin-top: 8px; overflow: hidden; }
+        details.anim-accordion summary { padding: 8px 10px; font-size: 17px; letter-spacing: 1px; color: var(--fnf-yellow); cursor: pointer; user-select: none; outline: none; text-transform: uppercase; }
+        details.anim-accordion summary:hover { background: rgba(139,19,240,0.1); }
+        .anim-accordion-content { padding: 10px; border-top: 2px solid rgba(139,19,240,0.2); }
+        .anim-subgroup { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed rgba(139,19,240,0.2); }
+        .anim-subgroup:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .anim-subgroup-title { font-size: 16px; color: var(--fnf-cyan); margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+
+        #test-black-screen { position: absolute; top:0; left:0; width:100%; height:100%; background:black; opacity:0; pointer-events:none; z-index:9999; transition:opacity 0.5s; }
+        #test-prompt-text { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: auto; min-width: 400px; text-align: center; color: var(--fnf-yellow); font-size: 20px; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 8px var(--fnf-yellow); z-index: 10000; display: none; background: rgba(0,0,0,0.8); padding: 8px 25px; border: 2px solid var(--fnf-yellow); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+
+        .btn { padding: 10px 18px; border: 2px solid transparent; cursor: pointer; font-family: 'VT323', monospace; text-transform: uppercase; font-size: 18px; letter-spacing: 1px; transition: all 0.15s; border-radius: 0; clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); }
+        .btn-primary { background: var(--fnf-border); color: white; border-color: #a830ff; }
+        .btn-primary:hover { background: #a830ff; box-shadow: var(--fnf-glow); }
+        .btn-accent { background: var(--fnf-accent); color: white; border-color: #ff5599; }
+        .btn-accent:hover { background: #ff5599; box-shadow: var(--fnf-glow-pink); }
+        .btn-success { background: #00a87a; color: white; border-color: var(--fnf-cyan); }
+        .btn-success:hover { background: var(--fnf-cyan); color: #000; }
+        .btn-danger { background: #c0182f; color: white; border-color: #ff3355; }
+        .btn-danger:hover { background: #ff3355; }
+        .btn-secondary { background: rgba(255,255,255,0.08); color: var(--fnf-dim); border: 2px solid rgba(255,255,255,0.2); font-size: 18px; font-family: 'VT323', monospace; padding: 10px 18px; cursor: pointer; border-radius: 0; text-transform: uppercase; letter-spacing: 1px; transition: all 0.15s; }
+        .btn-secondary:hover { border-color: white; color: white; }
+
+        /* Modal Settings */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-content { background: var(--fnf-panel); border: 4px solid var(--fnf-border); width: 400px; padding: 25px; position: relative; box-shadow: 0 0 30px rgba(139,19,240,0.4); clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15% 100%, 0 calc(100% - 15px)); animation: modalPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes modalPop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid var(--fnf-border); padding-bottom: 10px; }
+        .modal-title { font-size: 28px; color: var(--fnf-yellow); text-shadow: 0 0 10px var(--fnf-yellow); }
+
+        /* Context Menu */
+        .context-menu {
+            position: fixed; background: rgba(10, 10, 15, 0.95); border: 2px solid var(--fnf-border);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8), var(--fnf-glow); z-index: 10000;
+            display: none; flex-direction: column; min-width: 180px; padding: 5px;
+            font-family: 'VT323', monospace; text-transform: uppercase; font-size: 18px;
+        }
+        .context-menu-item { padding: 8px 12px; color: var(--fnf-dim); cursor: pointer; transition: all 0.1s; }
+        .context-menu-item:hover { background: rgba(139,19,240,0.3); color: white; padding-left: 18px; }
+        .context-menu-item.danger:hover { background: rgba(255, 51, 85, 0.3); color: #ff3355; }
+        .context-menu-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 4px 0; }
+
+        /* Tutorial Modal */
+        .tutorial-step { display: none; text-align: center; animation: fadeIn 0.3s; }
+        .tutorial-step.active { display: block; }
+        .tutorial-img { width: 100%; border: 2px solid var(--fnf-border); margin-bottom: 15px; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+        .tutorial-text { font-size: 20px; color: var(--fnf-cyan); margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+        .tutorial-nav { display: flex; justify-content: space-between; gap: 10px; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+
+</head>
+
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="text-align:left; display:flex; align-items:center; gap:12px;">
+                <img src="images/title/logo.png" style="height:44px; image-rendering: auto;">
+                <div>
+                    <h1 style="font-size:20px; letter-spacing:1px;">ADVANCED CUSTOM TITLE</h1>
+                    <p style="font-size:14px;">FNF TITLE SCREEN EDITOR</p>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <a href="https://youtube.com/@twgusta1" target="_blank" title="Visite meu Canal!" style="display:block; width:44px; height:44px;">
+                    <img src="images/credits.jpg" style="width:44px; height:44px; border:2px solid var(--fnf-border); clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); object-fit: cover; transition: transform 0.1s; display:block;">
+                </a>
+                <button class="btn btn-secondary" style="padding:8px; width:44px; height:44px; font-size:20px; display:flex; align-items:center; justify-content:center;" onclick="toggleSettingsModal(true)">⚙</button>
+            </div>
+        </div>
+
+        <div style="padding: 12px 16px; display: flex; gap: 8px; background: rgba(0,0,0,0.3); border-bottom: 2px solid rgba(139,19,240,0.3);">
+            <button class="btn btn-primary" style="flex:1" data-i18n="new_object" onclick="addImage()">+ NOVO OBJETO</button>
+            <button class="btn btn-accent" style="flex:1" data-i18n="test" onclick="startTest()">► TESTAR</button>
+            <button class="btn btn-secondary" style="padding:0 8px; font-size:16px;" onclick="undo()" id="btn-undo" title="Desfazer" disabled style="opacity:0.5;">↩</button>
+            <button class="btn btn-secondary" style="padding:0 8px; font-size:16px;" onclick="redo()" id="btn-redo" title="Refazer" disabled style="opacity:0.5;">↪</button>
+        </div>
+
+        <div class="sidebar-content">
+            <div class="section-title" data-i18n="settings_title">Config. Globais</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-i18n="bg_color">Cor de Fundo (HEX)</label>
+                    <input type="text" id="glob-bgColor" value="0xFFFFFFFF" oninput="updatePreview()" onchange="saveProject()">
+                </div>
+            </div>
+
+            <div class="section-title" data-i18n="objects_title">Objetos na Tela</div>
+            <div id="images-container"></div>
+        </div>
+
+        <div style="padding:12px 16px; background: rgba(0,0,0,0.4); border-top: 3px solid var(--fnf-border); display:flex; gap:8px;">
+            <button class="btn-secondary" style="flex:1" data-i18n="reset" onclick="resetProject()">↺ RESETAR</button>
+            <button class="btn btn-success" style="flex:2" data-i18n="export" onclick="openExportTutorial()">↓ EXPORTAR MOD (ZIP)</button>
+        </div>
+    </div>
+
+    <div class="preview-area" id="preview-area">
+        <div id="test-prompt-text">APERTE [ ENTER ] PARA INICIAR O TESTE DE TRANSIÇÃO</div>
+        <button id="test-exit-btn" onclick="stopTest(true)" style="display:none; position:absolute; top:20px; right:20px; z-index:10001; background:var(--fnf-accent); color:white; border:2px solid #ff5599; width:44px; height:44px; border-radius:0; font-family:'VT323',monospace; font-size:24px; cursor:pointer; clip-path:polygon(0 0,calc(100% - 5px) 0,100% 5px,100% 100%,5px 100%,0 calc(100% - 5px)); box-shadow:var(--fnf-glow-pink);">✖</button>
+        <div class="preview-wrapper" id="preview-wrapper">
+            <div id="preview-screen">
+                <div id="test-black-screen"></div>
+                <div id="test-flash-screen" style="position:absolute;top:0;left:0;width:100%;height:100%;background:white;opacity:0;pointer-events:none;z-index:10000;mix-blend-mode:add;"></div>
+                <div id="guide-h" class="smart-guide h"></div>
+                <div id="guide-v" class="smart-guide v"></div>
+            </div>
+        </div>
+        <div style="margin-top:16px; color:var(--fnf-cyan); font-size:18px; letter-spacing:2px; opacity:0.5;">
+            [CANTOS] ESCALA PROPORCIONAL &nbsp;|&nbsp; [LATERAIS] ESTICAR
+        </div>
+    </div>
+
+    <!-- Modal Configurações -->
+    <div id="settings-modal" class="modal-overlay" onclick="if(event.target === this) toggleSettingsModal(false)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" data-i18n="settings_title">CONFIGURAÇÕES DO PROJETO</div>
+                <button class="btn btn-danger" style="padding:4px 12px; font-size:20px;" onclick="toggleSettingsModal(false)">X</button>
+            </div>
+            
+            <div class="section-title" data-i18n="language" style="margin-top:0;">Idioma</div>
+            <div class="form-row" style="background: rgba(139,19,240,0.1); padding: 12px; border: 2px solid var(--fnf-border); margin-bottom:20px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+                    <select id="glob-lang" onchange="changeLanguage(this.value)" style="padding:6px; font-size:18px; background:var(--fnf-panel); color:white; border:none; outline:none;">
+                        <option value="pt">Português</option>
+                        <option value="en">English</option>
+                        <option value="es">Español</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="section-title">Audio</div>
+            <div class="form-row" style="background: rgba(139,19,240,0.1); padding: 12px; border: 2px solid var(--fnf-border);">
+                <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+                    <label data-i18n="bg_music" style="font-size:18px; margin:0;">Música de Fundo</label>
+                    <input type="checkbox" id="glob-bgMusic" checked onchange="toggleMusic()" style="width:24px; height:24px;">
+                </div>
+            </div>
+            <div style="margin-top:30px; text-align:center; opacity:0.3; font-size:14px;">ACT EDITOR V1.0 - ENGINE FNF</div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div id="context-menu" class="context-menu">
+        <div class="context-menu-item" data-i18n="duplicate" onclick="duplicateContextObject()">◫ DUPLICAR OBJETO</div>
+        <div class="context-menu-item" data-i18n="add_new" onclick="addImage()">+ ADICIONAR NOVO</div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item danger" data-i18n="delete_ctx" onclick="deleteContextObject()">✖ EXCLUIR OBJETO</div>
+    </div>
+
+    <!-- Modal Tutorial Exportação -->
+    <div id="export-tutorial-modal" class="modal-overlay" onclick="if(event.target === this) toggleExportTutorial(false)">
+        <div class="modal-content" style="width: 500px;">
+            <div class="modal-header">
+                <div class="modal-title">TUTORIAL DE INSTALAÇÃO</div>
+                <button class="btn btn-danger" style="padding:4px 12px; font-size:20px;" onclick="toggleExportTutorial(false)">X</button>
+            </div>
+            
+            <div id="step-1" class="tutorial-step active">
+                <img src="images/tutorial/t1.png" class="tutorial-img">
+                <div class="tutorial-text" data-i18n="step1">PASSO 1: primeiro extraia o arquivo zip</div>
+                <div class="tutorial-nav">
+                    <div style="flex:1"></div>
+                    <button class="btn btn-primary" data-i18n="next" onclick="nextStep(2)">PRÓXIMO ➔</button>
+                </div>
+            </div>
+
+            <div id="step-2" class="tutorial-step">
+                <img src="images/tutorial/t2.png" class="tutorial-img">
+                <div class="tutorial-text" data-i18n="step2">PASSO 2: copie as pastas images e scripts</div>
+                <div class="tutorial-nav">
+                    <button class="btn btn-secondary" data-i18n="back" onclick="nextStep(1)">⬅ VOLTAR</button>
+                    <button class="btn btn-primary" data-i18n="next" onclick="nextStep(3)">PRÓXIMO ➔</button>
+                </div>
+            </div>
+
+            <div id="step-3" class="tutorial-step">
+                <img src="images/tutorial/t3.png" class="tutorial-img">
+                <div class="tutorial-text" data-i18n="step3">PASSO 3: cole-as na pasta raiz do seu mod</div>
+                <div class="tutorial-nav">
+                    <button class="btn btn-secondary" data-i18n="back" onclick="nextStep(2)">⬅ VOLTAR</button>
+                    <button class="btn btn-success" data-i18n="export_now" onclick="exportModZip(); toggleExportTutorial(false);">↓ EXPORTAR AGORA</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let imagesData = [];
+        let uploadedFiles = {};
+        let selectedIdx = -1;
+        let currentScale = 1.0;
+        let bgMusic = null;
+        let testMusic = null;
+        let contextMenuTarget = -1;
+        let currentLang = 'en';
+
+        const i18n = {
+            pt: {
+                tab_geral: "GERAL", tab_anim: "ANIM", 
+                objects_title: "OBJETOS", new_object: "+ NOVO OBJETO",
+                bg_music: "Música de Fundo", recover: "RECUPERAR", save: "SALVAR", reset: "RESETAR", export: "↓ EXPORTAR MOD (ZIP)",
+                obj_props: "Propriedades do Objeto", basic_info: "Informações Básicas", asset_path: "Caminho do Asset", 
+                obj_type: "Tipo de Objeto", pos: "Posição (X, Y)", scale: "Escala (X, Y)", opacity: "Opacidade", z_index: "Ordem (Z-Index)",
+                anim_effects: "Animações e Efeitos", initial_phase: "Fase Inicial (Aparecimento)", slide: "Deslize (Slide)",
+                from: "De onde?", duration: "Duração", ease: "Suavização", fade: "Transparência (Fade)",
+                start: "Início", end: "Fim", speed: "Velocidade", entry_anim: "Animação de Entrada",
+                xml_name: "Nome no XML", looping: "Looping", idle_phase: "Fase de Espera (Idle)", enter_phase: "Fase de Enter (Confirmar)",
+                extras_loops: "Extras e Loops", pulse: "Pulso (Batida)", amount: "Quantidade", interval: "Intervalo",
+                anchor: "Âncora", force_pulse: "Forçar batida antes do Idle?", delete_obj: "✖ EXCLUIR OBJETO",
+                settings_title: "CONFIGURAÇÕES DO PROJETO", bg_color: "Cor de Fundo (Hex)", language: "Idioma",
+                tut_title: "TUTORIAL DE INSTALAÇÃO", step1: "PASSO 1: primeiro extraia o arquivo zip",
+                step2: "PASSO 2: copie as pastas images e scripts", step3: "PASSO 3: cole-as na pasta raiz do seu mod",
+                next: "PRÓXIMO ➔", back: "⬅ VOLTAR", export_now: "↓ EXPORTAR AGORA",
+                duplicate: "◫ DUPLICAR OBJETO", add_new: "+ ADICIONAR NOVO", delete_ctx: "✖ EXCLUIR OBJETO",
+                left: "Esquerda", right: "Direita", top: "Topo", bottom: "Baixo", none: "Nenhum",
+                yes: "Sim", no: "Não", test: "► TESTAR",
+                fade_time: "Tempo Fade (s)", freq: "Freq (s)", dur: "Dur (s)", force: "Forçar",
+                xml_prefix: "XML Prefix", up_png: "+ UPLOAD PNG", up_xml: "+ UPLOAD XML"
+            },
+            en: {
+                tab_geral: "GENERAL", tab_anim: "ANIM",
+                objects_title: "OBJECTS", new_object: "+ NEW OBJECT",
+                bg_music: "Background Music", recover: "RECOVER", save: "SAVE", reset: "RESET", export: "↓ EXPORT MOD (ZIP)",
+                obj_props: "Object Properties", basic_info: "Basic Information", asset_path: "Asset Path",
+                obj_type: "Object Type", pos: "Position (X, Y)", scale: "Scale (X, Y)", opacity: "Opacity", z_index: "Order (Z-Index)",
+                anim_effects: "Animations & Effects", initial_phase: "Initial Phase (Spawn)", slide: "Slide",
+                from: "From?", duration: "Duration", ease: "Easing", fade: "Fade",
+                start: "Start", end: "End", speed: "Speed", entry_anim: "Entry Animation",
+                xml_name: "XML Name", looping: "Looping", idle_phase: "Idle Phase", enter_phase: "Enter Phase (Confirm)",
+                extras_loops: "Extras & Loops", pulse: "Pulse (Beat)", amount: "Amount", interval: "Interval",
+                anchor: "Anchor", force_pulse: "Force beat before Idle?", delete_obj: "✖ DELETE OBJECT",
+                settings_title: "PROJECT SETTINGS", bg_color: "Background Color (Hex)", language: "Language",
+                tut_title: "INSTALLATION TUTORIAL", step1: "STEP 1: first extract the zip file",
+                step2: "STEP 2: copy the images and scripts folders", step3: "STEP 3: paste them in your mod's root folder",
+                next: "NEXT ➔", back: "⬅ BACK", export_now: "↓ EXPORT NOW",
+                duplicate: "◫ DUPLICATE OBJECT", add_new: "+ ADD NEW", delete_ctx: "✖ DELETE OBJECT",
+                left: "Left", right: "Right", top: "Top", bottom: "Bottom", none: "None",
+                yes: "Yes", no: "No", test: "► TEST",
+                fade_time: "Fade Time (s)", freq: "Freq (s)", dur: "Dur (s)", force: "Force",
+                xml_prefix: "XML Prefix", up_png: "+ UPLOAD PNG", up_xml: "+ UPLOAD XML"
+            },
+            es: {
+                tab_geral: "GENERAL", tab_anim: "ANIM",
+                objects_title: "OBJETOS", new_object: "+ NUEVO OBJETO",
+                bg_music: "Música de Fondo", recover: "RECUPERAR", save: "GUARDAR", reset: "REINICIAR", export: "↓ EXPORTAR MOD (ZIP)",
+                obj_props: "Propiedades del Objeto", basic_info: "Información Básica", asset_path: "Ruta del Asset",
+                obj_type: "Tipo de Objeto", pos: "Posición (X, Y)", scale: "Escala (X, Y)", opacity: "Opacidad", z_index: "Orden (Z-Index)",
+                anim_effects: "Animaciones y Efectos", initial_phase: "Fase Inicial (Aparición)", slide: "Deslizamiento",
+                from: "¿De dónde?", duration: "Duración", ease: "Suavizado", fade: "Transparencia (Fade)",
+                start: "Inicio", end: "Fin", speed: "Velocidade", entry_anim: "Animación de Entrada",
+                xml_name: "Nombre en XML", looping: "Bucle", idle_phase: "Fase de Espera (Idle)", enter_phase: "Fase de Enter (Confirmar)",
+                extras_loops: "Extras y Bucles", pulse: "Pulso (Latido)", amount: "Cantidad", interval: "Intervalo",
+                anchor: "Ancla", force_pulse: "¿Forzar latido antes del Idle?", delete_obj: "✖ ELIMINAR OBJETO",
+                settings_title: "CONFIGURACIÓN DEL PROYECTO", bg_color: "Color de Fondo (Hex)", language: "Idioma",
+                tut_title: "TUTORIAL DE INSTALAÇÃO", step1: "PASO 1: primero extrae el archivo zip",
+                step2: "PASO 2: copia las carpetas images y scripts", step3: "PASO 3: pégalas en la carpeta raíz de tu mod",
+                next: "SIGUIENTE ➔", back: "⬅ VOLVER", export_now: "↓ EXPORTAR AHORA",
+                duplicate: "◫ DUPLICAR OBJETO", add_new: "+ AÑADIR NUEVO", delete_ctx: "ELIMINAR OBJETO",
+                left: "Izquierda", right: "Derecha", top: "Arriba", bottom: "Abajo", none: "Ninguno",
+                yes: "Sí", no: "No", test: "► PROBAR",
+                fade_time: "Tiempo Fade (s)", freq: "Freq (s)", dur: "Dur (s)", force: "Forzar",
+                xml_prefix: "XML Prefix", up_png: "+ UPLOAD PNG", up_xml: "+ UPLOAD XML"
+            }
+        };
+
+        function initLanguage() {
+            const saved = localStorage.getItem('act-editor-lang');
+            if (saved) {
+                currentLang = saved;
+            } else {
+                const sysLang = navigator.language.split('-')[0];
+                if (i18n[sysLang]) currentLang = sysLang;
+                else currentLang = 'en';
+            }
+            document.getElementById('glob-lang').value = currentLang;
+            updateLanguage();
+        }
+
+        function changeLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('act-editor-lang', lang);
+            updateLanguage();
+            playSound('scrollMenu');
+        }
+
+        function updateLanguage() {
+            const texts = i18n[currentLang];
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (texts[key]) el.textContent = texts[key];
+            });
+            renderImages(); 
+            if (selectedIdx !== -1) renderObjectEditor();
+        }
+
+        // Context Menu Handlers
+        document.addEventListener('click', hideContextMenu);
+        function showContextMenu(e, idx) {
+            contextMenuTarget = idx;
+            const menu = document.getElementById('context-menu');
+            menu.style.display = 'flex';
+            let x = e.clientX; let y = e.clientY;
+            if (x + 200 > window.innerWidth) x -= 200;
+            if (y + 150 > window.innerHeight) y -= 150;
+            menu.style.left = x + 'px'; menu.style.top = y + 'px';
+        }
+        function hideContextMenu() {
+            const menu = document.getElementById('context-menu');
+            if (menu) menu.style.display = 'none';
+        }
+        function duplicateContextObject() {
+            if (contextMenuTarget === -1) return;
+            const cloned = JSON.parse(JSON.stringify(imagesData[contextMenuTarget]));
+            cloned.pos.x += 0.05; cloned.pos.y += 0.05; // Offset leve para não sobrepor exatamente
+            
+            // Adiciona no início da lista (topo das camadas)
+            imagesData.unshift(cloned);
+            selectedIdx = 0; 
+            
+            renderImages();
+            saveProject();
+        }
+        function deleteContextObject() {
+            if (contextMenuTarget === -1) return;
+            removeImage(contextMenuTarget);
+        }
+
+        function playStretchSound(phase) {
+            if (phase === 'start') {
+                playSound('elastic/stretch1_UI');
+            } else if (phase === 'stop') {
+                playSound('elastic/stretchSNAP_UI');
+            }
+        }
+
+        function initMusic() {
+            if (!bgMusic) {
+                bgMusic = new Audio('songs/chartEditorLoop.ogg');
+                bgMusic.loop = true;
+                bgMusic.volume = 0.3;
+            }
+            if (document.getElementById('glob-bgMusic').checked) {
+                bgMusic.play().catch(e => console.log("Autoplay blocked, waiting for interaction."));
+            }
+        }
+
+        function toggleMusic() {
+            if (!bgMusic) initMusic();
+            const isChecked = document.getElementById('glob-bgMusic').checked;
+            if (isChecked) {
+                bgMusic.play();
+                playSound('fav');
+            } else {
+                bgMusic.pause();
+                playSound('unfav');
+            }
+            saveProject(); // Salva preferência de música
+        }
+
+        // --- SISTEMA DE PERSISTÊNCIA (CACHE) ---
+        let historyStack = [];
+        let historyIndex = -1;
+        let isUndoRedoAction = false;
+
+        function pushHistory() {
+            if (isUndoRedoAction) return;
+            const stateStr = JSON.stringify({
+                imagesData: imagesData,
+                backgroundColor: document.getElementById('glob-bgColor').value
+            });
+            if (historyIndex >= 0 && historyStack[historyIndex] === stateStr) return;
+            if (historyIndex < historyStack.length - 1) {
+                historyStack = historyStack.slice(0, historyIndex + 1);
+            }
+            historyStack.push(stateStr);
+            historyIndex++;
+            if (historyStack.length > 50) {
+                historyStack.shift();
+                historyIndex--;
+            }
+            updateUndoRedoUI();
+        }
+
+        function undo() {
+            if (historyIndex > 0) {
+                isUndoRedoAction = true;
+                historyIndex--;
+                restoreState(historyStack[historyIndex]);
+            }
+        }
+
+        function redo() {
+            if (historyIndex < historyStack.length - 1) {
+                isUndoRedoAction = true;
+                historyIndex++;
+                restoreState(historyStack[historyIndex]);
+            }
+        }
+
+        function restoreState(stateStr) {
+            const state = JSON.parse(stateStr);
+            imagesData = JSON.parse(JSON.stringify(state.imagesData));
+            document.getElementById('glob-bgColor').value = state.backgroundColor;
+            renderImages();
+            updatePreview();
+            
+            const projectData = {
+                imagesData: imagesData,
+                backgroundColor: state.backgroundColor,
+                musicEnabled: document.getElementById('glob-bgMusic').checked
+            };
+            localStorage.setItem('ACT_Project_Cache', JSON.stringify(projectData));
+            
+            playSound('scrollMenu');
+            updateUndoRedoUI();
+            isUndoRedoAction = false;
+        }
+
+        function updateUndoRedoUI() {
+            const btnUndo = document.getElementById('btn-undo');
+            const btnRedo = document.getElementById('btn-redo');
+            if (btnUndo) { btnUndo.disabled = (historyIndex <= 0); btnUndo.style.opacity = (historyIndex <= 0) ? '0.5' : '1'; }
+            if (btnRedo) { btnRedo.disabled = (historyIndex >= historyStack.length - 1); btnRedo.style.opacity = (historyIndex >= historyStack.length - 1) ? '0.5' : '1'; }
+        }
+
+        function saveProject() {
+            if (isUndoRedoAction) return;
+            const projectData = {
+                imagesData: imagesData,
+                backgroundColor: document.getElementById('glob-bgColor').value,
+                musicEnabled: document.getElementById('glob-bgMusic').checked
+            };
+            localStorage.setItem('ACT_Project_Cache', JSON.stringify(projectData));
+            pushHistory();
+        }
+
+        function loadProject() {
+            const cache = localStorage.getItem('ACT_Project_Cache');
+            if (cache) {
+                try {
+                    const data = JSON.parse(cache);
+                    if (data.imagesData) imagesData = data.imagesData;
+                    if (data.backgroundColor) {
+                        document.getElementById('glob-bgColor').value = data.backgroundColor;
+                    }
+                    if (data.musicEnabled !== undefined) {
+                        document.getElementById('glob-bgMusic').checked = data.musicEnabled;
+                    }
+                    return true;
+                } catch(e) { console.error("Erro ao carregar cache:", e); }
+            }
+            return false;
+        }
+
+
+        function toggleSettingsModal(show) {
+            const modal = document.getElementById('settings-modal');
+            modal.style.display = show ? 'flex' : 'none';
+            if (show) playSound('scrollMenu');
+            else playSound('cancelMenu');
+        }
+
+        // Tenta iniciar a música no primeiro clique para burlar bloqueio de autoplay
+        document.addEventListener('click', () => { if (bgMusic && bgMusic.paused && document.getElementById('glob-bgMusic').checked && !isTesting) bgMusic.play(); }, { once: true });
+        window.addEventListener('load', () => { 
+            initLanguage();
+            setTimeout(initMusic, 1000); 
+        });
+
+        function autoScale() {
+            const area = document.getElementById('preview-area');
+            const wrapper = document.getElementById('preview-wrapper');
+            const margin = 120;
+            const targetW = 1280; const targetH = 720;
+            const availableW = area.clientWidth - margin;
+            const availableH = area.clientHeight - margin;
+            currentScale = Math.min(availableW / targetW, availableH / targetH, 1.0);
+            wrapper.style.transform = `scale(${currentScale})`;
+
+            // Compensar escala nos handles
+            document.querySelectorAll('.handle').forEach(h => {
+                h.style.transform = `scale(${1 / currentScale})`;
+            });
+        }
+
+        window.addEventListener('resize', autoScale);
+        let isResetting = false;
+        window.addEventListener('beforeunload', (e) => {
+            if (!isResetting) saveProject(); // Garante o salvamento no último segundo, exceto se estiver resetando
+        });
+
+        // Tutorial Logic
+        let currentStep = 1;
+        function openExportTutorial() {
+            currentStep = 1;
+            nextStep(1);
+            toggleExportTutorial(true);
+        }
+
+        function toggleExportTutorial(show) {
+            const modal = document.getElementById('export-tutorial-modal');
+            modal.style.display = show ? 'flex' : 'none';
+            if (show) playSound('scrollMenu');
+            else playSound('cancelMenu');
+        }
+
+        function nextStep(step) {
+            document.querySelectorAll('.tutorial-step').forEach(s => s.classList.remove('active'));
+            document.getElementById('step-' + step).classList.add('active');
+            currentStep = step;
+            playSound('scrollMenu');
+        }
+        
+        // Inicialização com Cache
+        window.onload = async () => {
+            const hasCache = loadProject();
+            
+            if (!hasCache) {
+                // Sem cache: carrega o template padrão com imagens
+                await preloadDefaults();
+                saveProject(); // Salva no cache e registra no histórico
+            } else {
+                // Com cache: restaura dados do JSON, re-busca imagens do disco
+                renderImages();
+                await reloadImages();
+                pushHistory(); // Registra estado inicial no histórico
+            }
+            autoScale();
+            initMusic();
+        };
+
+
+        // Recarrega as imagens do disco baseado no imagesData atual
+        async function reloadImages() {
+            for (let data of imagesData) {
+                const p = data.path;
+                if (!uploadedFiles[p]) uploadedFiles[p] = {};
+                // Só busca se ainda não tiver a imagem carregada
+                if (!uploadedFiles[p].pngDataUrl) {
+                    try {
+                        const url = 'images/title/' + p + '.png';
+                        const dims = await getImageDimensions(url).catch(() => ({ w: 150, h: 150 }));
+                        uploadedFiles[p].pngDataUrl = url;
+                        uploadedFiles[p].width = dims.w;
+                        uploadedFiles[p].height = dims.h;
+                        if (data.type === 'spritesheet') {
+                            const r = await fetch('images/title/' + p + '.xml').catch(() => null);
+                            if (r && r.ok) uploadedFiles[p].xmlString = await r.text();
+                        }
+                    } catch(e) { console.warn('Erro ao recarregar imagem:', p, e); }
+                }
+            }
+            renderImages();
+            updatePreview();
+        }
+
+
+        // Files Handling per Object
+        async function uploadObjectImage(index, file) {
+            if (!file) return;
+            const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.'));
+            const oldPath = imagesData[index].path;
+            
+            if (!uploadedFiles[nameWithoutExt]) uploadedFiles[nameWithoutExt] = {};
+            
+            // Migrate existing XML if path changes
+            if (oldPath !== nameWithoutExt && uploadedFiles[oldPath] && uploadedFiles[oldPath].rawFileXml) {
+                uploadedFiles[nameWithoutExt].rawFileXml = uploadedFiles[oldPath].rawFileXml;
+                uploadedFiles[nameWithoutExt].xmlString = uploadedFiles[oldPath].xmlString;
+            }
+
+            uploadedFiles[nameWithoutExt].rawFilePng = file;
+            uploadedFiles[nameWithoutExt].pngDataUrl = await readFileAsDataURL(file);
+            const dims = await getImageDimensions(uploadedFiles[nameWithoutExt].pngDataUrl);
+            uploadedFiles[nameWithoutExt].width = dims.w; uploadedFiles[nameWithoutExt].height = dims.h;
+
+            imagesData[index].path = nameWithoutExt;
+            renderImages();
+            updatePreview();
+        }
+
+        async function uploadObjectXml(index, file) {
+            if (!file) return;
+            const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.'));
+            const oldPath = imagesData[index].path;
+            
+            if (!uploadedFiles[nameWithoutExt]) uploadedFiles[nameWithoutExt] = {};
+            
+            // Migrate existing PNG if path changes
+            if (oldPath !== nameWithoutExt && uploadedFiles[oldPath] && uploadedFiles[oldPath].rawFilePng) {
+                uploadedFiles[nameWithoutExt].rawFilePng = uploadedFiles[oldPath].rawFilePng;
+                uploadedFiles[nameWithoutExt].pngDataUrl = uploadedFiles[oldPath].pngDataUrl;
+                uploadedFiles[nameWithoutExt].width = uploadedFiles[oldPath].width;
+                uploadedFiles[nameWithoutExt].height = uploadedFiles[oldPath].height;
+            }
+
+            uploadedFiles[nameWithoutExt].rawFileXml = file;
+            uploadedFiles[nameWithoutExt].xmlString = await file.text();
+
+            imagesData[index].path = nameWithoutExt;
+            imagesData[index].type = 'spritesheet';
+
+            renderImages();
+            updatePreview();
+        }
+
+        function readFileAsDataURL(file) { return new Promise(r => { const f = new FileReader(); f.onload = (e) => r(e.target.result); f.readAsDataURL(file); }); }
+        function getImageDimensions(url) {
+            return new Promise((resolve, reject) => {
+                const i = new Image();
+                i.onload = () => resolve({ w: i.width, h: i.height });
+                i.onerror = () => reject("Fail");
+                i.src = url;
+                // Timeout de 2s para não travar o site
+                setTimeout(() => reject("Timeout"), 2000);
+            });
+        }
+
+        function parseSparrow(xmlString, prefix) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+            const subTextures = Array.from(xmlDoc.getElementsByTagName("SubTexture"));
+            let frames = subTextures.filter(t => t.getAttribute("name").startsWith(prefix || ""));
+            if (frames.length === 0) frames = subTextures;
+            return frames.map(t => ({
+                x: parseInt(t.getAttribute("x")),
+                y: parseInt(t.getAttribute("y")),
+                width: parseInt(t.getAttribute("width")),
+                height: parseInt(t.getAttribute("height")),
+                frameX: parseInt(t.getAttribute("frameX") || "0"),
+                frameY: parseInt(t.getAttribute("frameY") || "0"),
+                frameWidth: parseInt(t.getAttribute("frameWidth") || t.getAttribute("width")),
+                frameHeight: parseInt(t.getAttribute("frameHeight") || t.getAttribute("height")),
+            }));
+        }
+
+        function hexToCss(hexStr) {
+            if (hexStr.length === 10) {
+                const a = parseInt(hexStr.substr(2, 2), 16) / 255;
+                const r = parseInt(hexStr.substr(4, 2), 16);
+                const g = parseInt(hexStr.substr(6, 2), 16);
+                const b = parseInt(hexStr.substr(8, 2), 16);
+                return `rgba(${r},${g},${b},${a})`;
+            }
+            return '#fff';
+        }
+
+        function getThumbnailHtml(img) {
+            const fileData = uploadedFiles[img.path];
+            if (!fileData || !fileData.pngDataUrl) {
+                return '<div style="width:40px; height:40px; background:rgba(0,0,0,0.5); border:1px dashed var(--fnf-border); display:flex; align-items:center; justify-content:center; font-size:10px; color:#666;">VAZIO</div>';
+            }
+            if (img.type === 'spritesheet' && fileData.xmlString) {
+                const frames = parseSparrow(fileData.xmlString, "");
+                if (frames.length > 0) {
+                    const f = frames[0];
+                    const scale = Math.min(40 / f.width, 40 / f.height);
+                    return `
+                    <div style="width:40px; height:40px; overflow:hidden; position:relative; background:rgba(0,0,0,0.5); border:1px solid var(--fnf-cyan); flex-shrink:0;" title="Preview: ${img.path}">
+                        <div style="
+                            position:absolute;
+                            background-image:url(${fileData.pngDataUrl});
+                            width:${f.width}px; height:${f.height}px;
+                            background-position: -${f.x}px -${f.y}px;
+                            transform: scale(${scale});
+                            transform-origin: top left;
+                            left: ${(40 - f.width * scale) / 2}px;
+                            top: ${(40 - f.height * scale) / 2}px;
+                            image-rendering: auto;
+                        "></div>
+                    </div>`;
+                }
+            }
+            return `
+            <div style="width:40px; height:40px; background:rgba(0,0,0,0.5); border:1px solid var(--fnf-cyan); flex-shrink:0; display:flex; align-items:center; justify-content:center; padding:2px;" title="Preview: ${img.path}">
+                <img src="${fileData.pngDataUrl}" style="max-width:100%; max-height:100%; object-fit:contain;">
+            </div>`;
+        }
+
+        function getDefaultImage() {
+            return {
+                path: "novoObjeto", type: "png",
+                pos: { x: 0.5, y: 0.5 }, scale: { x: 1, y: 1 }, alpha: 1.0,
+                start: { animation: { enabled: false, name: "", fps: 24, loop: false, offset: { x: 0, y: 0 } }, fade: { enabled: false, from: 0, to: 1, speed: 1 }, slide: { enabled: false, from: "left", duration: 1, ease: "quadOut", offset: { x: 0, y: 0 } } },
+                idle: { enabled: false, animation: { enabled: false, name: "", fps: 24, loop: true, offset: { x: 0, y: 0 } } },
+                enter: { enabled: false, animation: { enabled: false, name: "", fps: 24, loop: false, offset: { x: 0, y: 0 } }, fade: { enabled: false, to: 0, speed: 1 }, slide: { enabled: false, to: "right", duration: 1, ease: "quadOut", offset: { x: 0, y: 0 } } },
+                extras: { pulse: { enabled: false, scale: 0.1, speed: 1, interval: 0, ease: "quadOut", force: false } },
+                _tab: "geral"
+            };
+        }
+
+        function renderImages() {
+            const container = document.getElementById('images-container');
+            container.innerHTML = '';
+            imagesData.forEach((img, index) => {
+                const card = document.createElement('div');
+                card.className = 'image-card' + (selectedIdx === index ? ' selected' : '');
+                
+                card.draggable = true;
+                card.ondragstart = (e) => {
+                    const targetCard = e.target.closest('.image-card');
+                    if (!targetCard) return;
+                    e.dataTransfer.setData('text/plain', index);
+                    e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => targetCard.style.opacity = '0.4', 0);
+                };
+                card.ondragend = (e) => {
+                    e.target.style.opacity = '1';
+                };
+                card.ondragover = (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    
+                    // Auto-scroll logic
+                    const sidebarContent = document.querySelector('.sidebar-content');
+                    if (sidebarContent) {
+                        const rect = sidebarContent.getBoundingClientRect();
+                        const scrollZone = 50; 
+                        if (e.clientY - rect.top < scrollZone) {
+                            sidebarContent.scrollTop -= 15;
+                        } else if (rect.bottom - e.clientY < scrollZone) {
+                            sidebarContent.scrollTop += 15;
+                        }
+                    }
+                };
+                card.ondrop = (e) => {
+                    e.preventDefault();
+                    const draggedIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                    const targetIdx = index;
+                    if (draggedIdx === targetIdx || isNaN(draggedIdx)) return;
+                    
+                    const draggedItem = imagesData.splice(draggedIdx, 1)[0];
+                    imagesData.splice(targetIdx, 0, draggedItem);
+                    
+                    if (selectedIdx === draggedIdx) selectedIdx = targetIdx;
+                    else if (selectedIdx > draggedIdx && selectedIdx <= targetIdx) selectedIdx--;
+                    else if (selectedIdx < draggedIdx && selectedIdx >= targetIdx) selectedIdx++;
+                    
+                    playSound('scrollMenu');
+                    renderImages();
+                    updatePreview();
+                    saveProject();
+                };
+
+                card.onclick = (e) => {
+                    const ignoreTags = ['INPUT', 'SELECT', 'BUTTON', 'SUMMARY', 'DETAILS'];
+                    if (!ignoreTags.includes(e.target.tagName)) {
+                        if (selectedIdx !== index) selectObject(index);
+                    }
+                };
+                const tab = img._tab || "geral";
+                const t = i18n[currentLang];
+                card.innerHTML = `
+                    <div class="image-card-header">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div style="display:flex; flex-direction:column; gap:2px;">
+                                <button class="btn btn-secondary" style="padding:0 4px; font-size:12px; height:18px; line-height:1;" onclick="event.stopPropagation(); moveLayer(${index}, -1)" title="Mover Camada Acima">▲</button>
+                                <button class="btn btn-secondary" style="padding:0 4px; font-size:12px; height:18px; line-height:1;" onclick="event.stopPropagation(); moveLayer(${index}, 1)" title="Mover Camada Abaixo">▼</button>
+                            </div>
+                            ${getThumbnailHtml(img)}
+                            <h3 style="margin:0; font-size:22px; color:var(--fnf-cyan); text-shadow:0 0 5px rgba(0,245,212,0.5); cursor:grab;">[ ${img.path} ]</h3>
+                        </div>
+                        <button class="btn btn-danger" style="padding:2px 8px; font-size:16px;" onclick="event.stopPropagation(); removeImage(${index})">X</button>
+                    </div>
+                    <div style="display:flex; gap:4px; margin-bottom:12px;">
+                        <button class="tab-btn ${tab === 'geral' ? 'active' : ''}" onclick="event.stopPropagation(); updateData(${index}, '_tab', 'geral'); renderImages();">${t.tab_geral}</button>
+                        <button class="tab-btn ${tab === 'anim' ? 'active' : ''}" onclick="event.stopPropagation(); updateData(${index}, '_tab', 'anim'); renderImages();">${t.tab_anim}</button>
+                    </div>
+                    <div class="tab-content">
+                        ${tab === 'geral' ? `
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>${t.asset_path} (PNG)</label>
+                                    <button class="btn btn-secondary" style="font-size: 16px; width: 100%;" onclick="document.getElementById('file-png-${index}').click()">
+                                        ${uploadedFiles[img.path] && uploadedFiles[img.path].pngDataUrl ? `✅ ${img.path}.png` : t.up_png}
+                                    </button>
+                                    <input type="file" id="file-png-${index}" accept=".png" style="display:none" onchange="uploadObjectImage(${index}, this.files[0])">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label>${t.pos} X (%)</label><input type="number" step="0.01" value="${img.pos.x}" oninput="updateData(${index}, 'pos.x', this.value)"></div>
+                                <div class="form-group"><label>${t.pos} Y (%)</label><input type="number" step="0.01" value="${img.pos.y}" oninput="updateData(${index}, 'pos.y', this.value)"></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label>${t.scale} X</label><input type="number" step="0.1" value="${img.scale.x}" oninput="updateData(${index}, 'scale.x', this.value)"></div>
+                                <div class="form-group"><label>${t.scale} Y</label><input type="number" step="0.1" value="${img.scale.y}" oninput="updateData(${index}, 'scale.y', this.value)"></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label>${t.opacity}</label><input type="number" step="0.1" value="${img.alpha}" oninput="updateData(${index}, 'alpha', this.value)"></div>
+                            </div>
+                        ` : ''}
+                        ${tab === 'anim' ? `
+                            <details class="anim-accordion" ${img._basicOpen ? 'open' : ''} ontoggle="imagesData[${index}]._basicOpen = this.open">
+                                <summary>${t.anim_effects}</summary>
+                                <div class="anim-accordion-content">
+                                    <div class="anim-subgroup">
+                                        <div class="anim-subgroup-title">▶ ${t.initial_phase}</div>
+                                        <div class="form-row">
+                                            <div class="form-group"><label>${t.fade}</label><select onchange="updateData(${index}, 'start.fade.enabled', this.value === 'sim'); updateData(${index}, 'start.fade.from', 0); updateData(${index}, 'start.fade.to', 1); renderImages();"><option value="nao">${t.no}</option><option value="sim" ${img.start.fade.enabled ? 'selected' : ''}>${t.yes}</option></select></div>
+                                            <div class="form-group"><label>${t.slide}</label><select onchange="updateData(${index}, 'start.slide.from', this.value); updateData(${index}, 'start.slide.enabled', this.value !== 'none'); renderImages();"><option value="none">${t.none}</option><option value="left" ${img.start.slide.from === 'left' ? 'selected' : ''}>${t.left}</option><option value="right" ${img.start.slide.from === 'right' ? 'selected' : ''}>${t.right}</option><option value="top" ${img.start.slide.from === 'top' ? 'selected' : ''}>${t.top}</option><option value="bottom" ${img.start.slide.from === 'bottom' ? 'selected' : ''}>${t.bottom}</option></select></div>
+                                        </div>
+                                        ${img.start.fade.enabled ? `
+                                        <div class="form-row">
+                                            <div class="form-group"><label>${t.fade_time}</label><input type="number" step="0.1" value="${img.start.fade.speed}" oninput="updateData(${index}, 'start.fade.speed', this.value)"></div>
+                                        </div>
+                                        ` : ''}
+                                        ${img.start.slide.enabled ? `
+                                        <div class="form-row">
+                                            <div class="form-group"><label>${t.ease}</label><select onchange="updateData(${index}, 'start.slide.ease', this.value)">
+                                                <option value="linear" ${img.start.slide.ease === 'linear' ? 'selected' : ''}>Linear</option>
+                                                <option value="quadOut" ${img.start.slide.ease === 'quadOut' ? 'selected' : ''}>QuadOut</option>
+                                                <option value="expoOut" ${img.start.slide.ease === 'expoOut' ? 'selected' : ''}>ExpoOut</option>
+                                                <option value="bounceOut" ${img.start.slide.ease === 'bounceOut' ? 'selected' : ''}>BounceOut</option>
+                                                <option value="elasticOut" ${img.start.slide.ease === 'elasticOut' ? 'selected' : ''}>ElasticOut</option>
+                                                <option value="backOut" ${img.start.slide.ease === 'backOut' ? 'selected' : ''}>BackOut</option>
+                                            </select></div>
+                                            <div class="form-group" style="flex:0.5"><label>${t.duration}</label><input type="number" step="0.1" value="${img.start.slide.duration}" oninput="updateData(${index}, 'start.slide.duration', this.value)"></div>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                    <div class="anim-subgroup">
+                                        <div class="anim-subgroup-title">▶ ${t.idle_phase}</div>
+                                        <div class="form-row">
+                                            <div class="form-group"><label>Efeito</label><select onchange="updateData(${index}, 'extras.pulse.enabled', this.value === 'pulso'); renderImages();"><option value="nenhum" ${!img.extras.pulse.enabled ? 'selected' : ''}>${t.none || 'Nenhum'}</option><option value="pulso" ${img.extras.pulse.enabled ? 'selected' : ''}>${t.pulse}</option></select></div>
+                                        </div>
+                                        ${img.extras.pulse.enabled ? `
+                                        <div class="form-row">
+                                            <div class="form-group"><label>Curva</label><select onchange="updateData(${index}, 'extras.pulse.ease', this.value)">
+                                                <option value="linear" ${img.extras.pulse.ease === 'linear' ? 'selected' : ''}>Linear</option>
+                                                <option value="quadOut" ${img.extras.pulse.ease === 'quadOut' ? 'selected' : ''}>QuadOut</option>
+                                                <option value="expoOut" ${img.extras.pulse.ease === 'expoOut' ? 'selected' : ''}>ExpoOut</option>
+                                                <option value="bounceOut" ${img.extras.pulse.ease === 'bounceOut' ? 'selected' : ''}>BounceOut</option>
+                                                <option value="elasticOut" ${img.extras.pulse.ease === 'elasticOut' ? 'selected' : ''}>ElasticOut</option>
+                                            </select></div>
+                                            <div class="form-group"><label>${t.amount}</label><input type="number" step="0.05" value="${img.extras.pulse.scale}" oninput="updateData(${index}, 'extras.pulse.scale', this.value)"></div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group"><label>${t.freq}</label><input type="number" step="0.1" value="${img.extras.pulse.interval}" oninput="updateData(${index}, 'extras.pulse.interval', this.value)"></div>
+                                            <div class="form-group"><label>${t.dur}</label><input type="number" step="0.1" value="${img.extras.pulse.speed}" oninput="updateData(${index}, 'extras.pulse.speed', this.value)"></div>
+                                            <div class="form-group" style="flex:0.4; text-align:center; display:flex; flex-direction:column; align-items:center; gap:5px;"><label>${t.force}</label><input type="checkbox" ${img.extras.pulse.force ? 'checked' : ''} onchange="updateData(${index}, 'extras.pulse.force', this.checked)"></div>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                    <div class="anim-subgroup">
+                                        <div class="anim-subgroup-title">▶ ${t.enter_phase}</div>
+                                        <div class="form-row">
+                                            <div class="form-group"><label>${t.fade}</label><select onchange="updateData(${index}, 'enter.fade.enabled', this.value === 'sim'); updateData(${index}, 'enter.fade.to', 0); updateData(${index}, 'enter.enabled', true); renderImages();"><option value="nao">${t.no}</option><option value="sim" ${img.enter.fade.enabled ? 'selected' : ''}>${t.yes}</option></select></div>
+                                            <div class="form-group"><label>${t.slide}</label><select onchange="updateData(${index}, 'enter.slide.to', this.value); updateData(${index}, 'enter.slide.enabled', this.value !== 'none'); updateData(${index}, 'enter.enabled', this.value !== 'none'); renderImages();"><option value="none">${t.none}</option><option value="left" ${img.enter.slide.to === 'left' ? 'selected' : ''}>${t.left}</option><option value="right" ${img.enter.slide.to === 'right' ? 'selected' : ''}>${t.right}</option><option value="top" ${img.enter.slide.to === 'top' ? 'selected' : ''}>${t.top}</option><option value="bottom" ${img.enter.slide.to === 'bottom' ? 'selected' : ''}>${t.bottom}</option></select></div>
+                                        </div>
+                                        ${img.enter.fade.enabled || img.enter.slide.enabled ? `
+                                        <div class="form-row">
+                                            <div class="form-group" style="flex:1.5"><label>Curva</label><select onchange="updateData(${index}, 'enter.slide.ease', this.value)">
+                                                <option value="linear" ${img.enter.slide.ease === 'linear' ? 'selected' : ''}>Linear</option>
+                                                <option value="quadOut" ${img.enter.slide.ease === 'quadOut' ? 'selected' : ''}>QuadOut</option>
+                                                <option value="expoOut" ${img.enter.slide.ease === 'expoOut' ? 'selected' : ''}>ExpoOut</option>
+                                                <option value="bounceOut" ${img.enter.slide.ease === 'bounceOut' ? 'selected' : ''}>BounceOut</option>
+                                                <option value="elasticOut" ${img.enter.slide.ease === 'elasticOut' ? 'selected' : ''}>ElasticOut</option>
+                                                <option value="backOut" ${img.enter.slide.ease === 'backOut' ? 'selected' : ''}>BackOut</option>
+                                            </select></div>
+                                            <div class="form-group" style="flex:0.5"><label>Duração</label><input type="number" step="0.1" value="${img.enter.fade.speed || img.enter.slide.duration}" oninput="updateData(${index}, 'enter.fade.speed', this.value); updateData(${index}, 'enter.slide.duration', this.value);"></div>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </details>
+
+                            <details class="anim-accordion" ${img._spriteOpen ? 'open' : ''} ontoggle="imagesData[${index}]._spriteOpen = this.open">
+                                <summary>Spritesheet (XML)</summary>
+                                <div class="anim-accordion-content">
+                                    <div class="form-row" style="margin-bottom: 12px;">
+                                        <div class="form-group">
+                                            <label>Spritesheet (XML)</label>
+                                            <button class="btn btn-primary" style="font-size: 16px; width: 100%;" onclick="document.getElementById('file-xml-${index}').click()">
+                                                ${uploadedFiles[img.path] && uploadedFiles[img.path].xmlString ? `✅ ${img.path}.xml` : `+ UPLOAD XML`}
+                                            </button>
+                                            <input type="file" id="file-xml-${index}" accept=".xml" style="display:none" onchange="uploadObjectXml(${index}, this.files[0])">
+                                        </div>
+                                    </div>
+                                    ${uploadedFiles[img.path] && uploadedFiles[img.path].xmlString ? `
+                                        <div class="anim-subgroup">
+                                            <div class="anim-subgroup-title">▶ ENTRADA (START)</div>
+                                            <div class="form-row">
+                                                <div class="form-group"><label>${t.xml_prefix}</label><input type="text" placeholder="Ex: logo bumpin" value="${img.start.animation.name}" oninput="updateData(${index}, 'start.animation.name', this.value); updateData(${index}, 'start.animation.enabled', true);"></div>
+                                                <div class="form-group" style="flex:0.4"><label>FPS</label><input type="number" value="${img.start.animation.fps}" oninput="updateData(${index}, 'start.animation.fps', this.value)"></div>
+                                            </div>
+                                        </div>
+                                        <div class="anim-subgroup">
+                                            <div class="anim-subgroup-title">🔁 IDLE (LOOP)</div>
+                                            <div class="form-row">
+                                                <div class="form-group"><label>XML Prefix</label><input type="text" placeholder="Ex: gfDance" value="${img.idle.animation.name}" oninput="updateData(${index}, 'idle.animation.name', this.value); updateData(${index}, 'idle.animation.enabled', true); updateData(${index}, 'idle.enabled', true);"></div>
+                                                <div class="form-group" style="flex:0.3"><label>FPS</label><input type="number" value="${img.idle.animation.fps}" oninput="updateData(${index}, 'idle.animation.fps', this.value)"></div>
+                                                <div class="form-group" style="flex:0.2; text-align:center;"><label>Loop</label><input type="checkbox" ${img.idle.animation.loop ? 'checked' : ''} onchange="updateData(${index}, 'idle.animation.loop', this.checked)"></div>
+                                            </div>
+                                        </div>
+                                        <div class="anim-subgroup">
+                                            <div class="anim-subgroup-title">⏹ SAÍDA (ENTER)</div>
+                                            <div class="form-row">
+                                                <div class="form-group"><label>XML Prefix</label><input type="text" placeholder="Ex: BF HEY" value="${img.enter.animation.name}" oninput="updateData(${index}, 'enter.animation.name', this.value); updateData(${index}, 'enter.animation.enabled', true); updateData(${index}, 'enter.enabled', true);"></div>
+                                                <div class="form-group" style="flex:0.3"><label>FPS</label><input type="number" value="${img.enter.animation.fps}" oninput="updateData(${index}, 'enter.animation.fps', this.value)"></div>
+                                                <div class="form-group" style="flex:0.2; text-align:center;"><label>Loop</label><input type="checkbox" ${img.enter.animation.loop ? 'checked' : ''} onchange="updateData(${index}, 'enter.animation.loop', this.checked)"></div>
+                                            </div>
+                                        </div>
+                                    ` : `
+                                        <div style="text-align:center; padding:10px; color:var(--fnf-dim); font-size:16px;">
+                                            <p style="margin:0;">⚠️ REQUER XML PARA ANIMAÇÃO SPARROW</p>
+                                        </div>
+                                    `}
+                                </div>
+                            </details>
+                        ` : ''}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            updatePreview();
+        }
+        function playSound(name) {
+            const audio = new Audio('songs/' + name + '.ogg');
+            audio.volume = 0.4;
+            audio.play().catch(() => {});
+        }
+
+        // Som de Hover Global (estilo FNF)
+        // Som de Hover Global (estilo FNF)
+        document.addEventListener('mouseover', (e) => {
+            const target = e.target.closest('button, select, summary, .tab-btn, .image-card, input[type="checkbox"]');
+            if (target && !target.dataset.hovered) {
+                playSound('scrollMenu');
+                target.dataset.hovered = "true";
+                target.addEventListener('mouseleave', () => { delete target.dataset.hovered; }, { once: true });
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            const target = e.target.closest('button, .tab-btn, .image-card, input[type="checkbox"], select, summary');
+            if (target) {
+                playSound('noteLay');
+            }
+        });
+
+        // Efeitos sonoros para inputs numéricos (Spinner/Setas)
+        document.addEventListener('input', (e) => {
+            if (e.target.tagName === 'INPUT' && e.target.type === 'number') {
+                const val = parseFloat(e.target.value);
+                const prev = parseFloat(e.target.dataset.prevVal);
+                if (!isNaN(val) && !isNaN(prev) && val !== prev) {
+                    playSound(val > prev ? 'ClickUp' : 'ClickDown');
+                }
+                e.target.dataset.prevVal = val;
+            }
+        });
+        document.addEventListener('mousedown', (e) => {
+            if (e.target.tagName === 'INPUT' && e.target.type === 'number') {
+                e.target.dataset.prevVal = e.target.value;
+            }
+        }, true);
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' && e.target.type === 'number') {
+                e.target.dataset.prevVal = e.target.value;
+            }
+        }, true);
+
+        function selectObject(index) { 
+            if (selectedIdx !== index) playSound('scrollMenu');
+            selectedIdx = index; 
+            renderImages(); 
+        }
+        function addImage() { 
+            imagesData.unshift(getDefaultImage()); 
+            selectedIdx = 0; 
+            playSound('scrollMenu');
+            renderImages(); 
+            saveProject();
+        }
+        function removeImage(index) { 
+            imagesData.splice(index, 1); 
+            if (selectedIdx >= imagesData.length) selectedIdx = -1; 
+            playSound('cancelMenu');
+            renderImages(); 
+            saveProject();
+        }
+
+        function moveLayer(index, dir) {
+            const newIndex = index + dir;
+            if (newIndex >= 0 && newIndex < imagesData.length) {
+                const temp = imagesData[index];
+                imagesData[index] = imagesData[newIndex];
+                imagesData[newIndex] = temp;
+                if (selectedIdx === index) selectedIdx = newIndex;
+                else if (selectedIdx === newIndex) selectedIdx = index;
+                playSound('scrollMenu');
+                renderImages();
+                updatePreview();
+                saveProject();
+            }
+        }
+
+        function updateData(index, path, value) {
+            let keys = path.split('.'); let obj = imagesData[index];
+            for (let i = 0; i < keys.length - 1; i++) { obj = obj[keys[i]]; }
+            if (typeof value === "string") {
+                if (value === "true") value = true; 
+                else if (value === "false") value = false;
+                else if (!isNaN(value) && value.trim() !== "") value = parseFloat(value);
+            }
+            if (typeof value === "boolean") playSound(value ? 'fav' : 'unfav');
+            obj[keys[keys.length - 1]] = value;
+
+            if (path.includes('animation.name') && value.trim() !== "") {
+                imagesData[index].type = 'spritesheet';
+            }
+
+            if (path === 'start.slide.from') imagesData[index].start.slide.enabled = (value !== 'none');
+            if (path === 'enter.slide.to') imagesData[index].enter.slide.enabled = (value !== 'none');
+            updatePreview();
+            saveProject();
+        }
+
+        // Preview Logic
+        let isDragging = false; let dragMode = ""; let dragIndex = -1;
+        let startX, startY, origPosX, origPosY, origScaleX, origScaleY;
+        let isTesting = false; let isEnterPhase = false; let isStartPhase = false; let animIntervals = [];
+
+        function updatePreview() {
+            const preview = document.getElementById('preview-screen');
+            animIntervals.forEach(id => { clearInterval(id); clearTimeout(id); });
+            animIntervals = [];
+            const blackScreen = document.getElementById('test-black-screen');
+            const flashScreen = document.getElementById('test-flash-screen');
+            const promptText = document.getElementById('test-prompt-text');
+            const guideH = document.getElementById('guide-h');
+            const guideV = document.getElementById('guide-v');
+            preview.innerHTML = ''; 
+            if (blackScreen) preview.appendChild(blackScreen); 
+            if (flashScreen) preview.appendChild(flashScreen);
+            if (guideH) preview.appendChild(guideH);
+            if (guideV) preview.appendChild(guideV);
+            preview.style.backgroundColor = hexToCss(document.getElementById('glob-bgColor').value);
+
+            // A ordem do array define as camadas. Index 0 = Topo. Index N = Fundo.
+            // Para desenhar no HTML corretamente, precisamos desenhar o fundo (Index N) primeiro.
+            const sortedIndices = imagesData.map((d, i) => i).reverse();
+            sortedIndices.forEach(idx => {
+                const data = imagesData[idx];
+                const el = document.createElement('div');
+                el.className = 'preview-element' + (selectedIdx === idx ? ' selected' : '');
+                // O zIndex no CSS será apenas o valor natural do fluxo, não precisamos forçar a menos que desejado.
+                // Mas para garantir o click events podemos setar manualmente ou deixar o DOM order cuidar.
+                el.style.zIndex = (imagesData.length - idx) * 10;
+                el.style.opacity = data.alpha;
+                el.id = 'element-' + idx;
+                preview.appendChild(el);
+
+                // Handles
+                ['n', 's', 'e', 'w', 'se'].forEach(dir => {
+                    const h = document.createElement('div');
+                    h.className = `handle ${dir}`;
+                    h.style.transform = `scale(${1 / currentScale})`;
+                    h.onmousedown = (e) => {
+                        e.stopPropagation(); dragMode = dir; dragIndex = idx;
+                        startX = e.clientX; startY = e.clientY;
+                        origScaleX = data.scale.x; origScaleY = data.scale.y;
+                        document.body.classList.add('dragging');
+                        playStretchSound('start');
+                        document.onmousemove = onHandleMove; document.onmouseup = stopDrag;
+                    };
+                    el.appendChild(h);
+                });
+
+                el.oncontextmenu = (e) => {
+                    if (isTesting) return;
+                    e.preventDefault(); e.stopPropagation();
+                    selectObject(idx);
+                    showContextMenu(e, idx);
+                };
+
+                el.onmousedown = (e) => {
+                    if (isTesting) return; e.preventDefault(); selectObject(idx);
+                    dragMode = "move"; dragIndex = idx; startX = e.clientX; startY = e.clientY;
+                    origPosX = data.pos.x; origPosY = data.pos.y;
+                    document.body.classList.add('dragging');
+                    document.onmousemove = onDrag; document.onmouseup = stopDrag;
+                };
+
+                let fileObj = uploadedFiles[data.path];
+                let baseW = 150, baseH = 150, frameX = 0, frameY = 0, sprW = 150, sprH = 150;
+
+                const spriteCont = document.createElement('div');
+                spriteCont.className = 'sprite-container';
+                
+                let cssAnchor = "center center";
+                if (data.extras && data.extras.pulse && data.extras.pulse.anchor) {
+                    const a = data.extras.pulse.anchor;
+                    if (a === "bottom") cssAnchor = "center bottom";
+                    else if (a === "top") cssAnchor = "center top";
+                    else if (a === "left") cssAnchor = "left center";
+                    else if (a === "right") cssAnchor = "right center";
+                }
+                spriteCont.style.transformOrigin = cssAnchor;
+
+                const spriteLayer = document.createElement('div');
+                spriteLayer.className = 'sprite-layer';
+                spriteCont.appendChild(spriteLayer);
+                el.appendChild(spriteCont);
+
+                if (fileObj && fileObj.pngDataUrl) {
+                    spriteLayer.style.backgroundImage = `url(${fileObj.pngDataUrl})`;
+                    if (data.type === 'spritesheet' && fileObj.xmlString) {
+                        // Determina qual animação tocar
+                        let currentPhase = 'idle';
+                        if (isTesting && isEnterPhase && data.enter.animation.enabled) {
+                            currentPhase = 'enter';
+                        } else if (data.start.animation.enabled) {
+                            currentPhase = 'start';
+                        }
+
+                        const getAnim = (phase) => {
+                            const cfg = phase === 'start' ? data.start.animation
+                                      : phase === 'enter' ? data.enter.animation
+                                      : data.idle.animation;
+                            return {
+                                frames: parseSparrow(fileObj.xmlString, cfg.name),
+                                fps: cfg.fps || 24,
+                                loop: phase === 'idle' ? (cfg.loop !== false) : (cfg.loop === true)
+                            };
+                        };
+
+                        let anim = getAnim(currentPhase);
+                        let frames = anim.frames;
+                        let fps = anim.fps;
+                        let shouldLoop = anim.loop;
+
+                        if (frames.length > 0) {
+                            let frameIdx = 0;
+                            const updateFrame = () => {
+                                if (!frames || frames.length === 0) return;
+                                const f = frames[frameIdx];
+                                baseW = f.frameWidth; baseH = f.frameHeight;
+                                sprW = f.width; sprH = f.height;
+                                frameX = -f.frameX; frameY = -f.frameY;
+
+                                el.style.width = (baseW * data.scale.x) + 'px';
+                                el.style.height = (baseH * data.scale.y) + 'px';
+                                spriteLayer.style.width = (sprW * data.scale.x) + 'px';
+                                spriteLayer.style.height = (sprH * data.scale.y) + 'px';
+                                spriteLayer.style.left = (frameX * data.scale.x) + 'px';
+                                spriteLayer.style.top = (frameY * data.scale.y) + 'px';
+                                spriteLayer.style.backgroundPosition = `-${f.x * data.scale.x}px -${f.y * data.scale.y}px`;
+                                spriteLayer.style.backgroundSize = `${fileObj.width * data.scale.x}px ${fileObj.height * data.scale.y}px`;
+                                el.style.left = ((1280 * data.pos.x) - (baseW * data.scale.x / 2)) + 'px';
+                                el.style.top = ((720 * data.pos.y) - (baseH * data.scale.y / 2)) + 'px';
+
+                                const atEnd = frameIdx + 1 >= frames.length;
+                                if (atEnd && !shouldLoop) {
+                                    // Start terminou → transicionar para Idle
+                                    if (currentPhase === 'start' && data.idle.animation.enabled) {
+                                        currentPhase = 'idle';
+                                        const nextAnim = getAnim('idle');
+                                        frames = nextAnim.frames;
+                                        fps = nextAnim.fps;
+                                        shouldLoop = nextAnim.loop;
+                                        frameIdx = 0;
+                                    }
+                                    // Enter sem loop → fica no último frame
+                                } else {
+                                    frameIdx = (frameIdx + 1) % frames.length;
+                                }
+                            };
+                            updateFrame();
+                            const intervalId = setInterval(updateFrame, 1000 / fps);
+                            animIntervals.push(intervalId);
+                        }
+                    } else {
+                        baseW = fileObj.width; baseH = fileObj.height;
+                        el.style.width = (baseW * data.scale.x) + 'px';
+                        el.style.height = (baseH * data.scale.y) + 'px';
+                        spriteLayer.style.width = '100%'; spriteLayer.style.height = '100%';
+                        spriteLayer.style.backgroundSize = '100% 100%';
+                        el.style.left = ((1280 * data.pos.x) - (baseW * data.scale.x / 2)) + 'px';
+                        el.style.top = ((720 * data.pos.y) - (baseH * data.scale.y / 2)) + 'px';
+                    }
+                } else {
+                    el.style.width = (150 * data.scale.x) + 'px';
+                    el.style.height = (150 * data.scale.y) + 'px';
+                    spriteLayer.style.backgroundColor = 'rgba(255,255,255,0.05)';
+                    spriteLayer.style.border = '2px dashed rgba(255,255,255,0.2)';
+                    spriteLayer.style.display = 'flex'; spriteLayer.style.alignItems = 'center'; spriteLayer.style.justifyContent = 'center';
+                    spriteLayer.innerText = data.path;
+                    el.style.left = ((1280 * data.pos.x) - (150 * data.scale.x / 2)) + 'px';
+                    el.style.top = ((720 * data.pos.y) - (150 * data.scale.y / 2)) + 'px';
+                }
+
+                // Efeito Pulsar (Beat)
+                if (data.extras && data.extras.pulse && data.extras.pulse.enabled) {
+                    const force = data.extras.pulse.force;
+                    const hasEnterAnim = data.enter.enabled && (data.enter.slide.enabled || data.enter.fade.enabled || data.enter.animation.enabled);
+                    const isDuringEnter = isTesting && isEnterPhase;
+                    const shouldStopForEnter = isDuringEnter && hasEnterAnim && !force;
+
+                    const hasStartAnim = data.start.animation.enabled || data.start.slide.enabled || data.start.fade.enabled;
+                    const isDuringStart = isTesting && isStartPhase;
+                    const shouldWaitForStart = isDuringStart && hasStartAnim && !force;
+
+                    if (!shouldStopForEnter) {
+                        const baseSX = data.scale.x || 1;
+                        const baseSY = data.scale.y || 1;
+                        const amount = parseFloat(data.extras.pulse.scale) || 0;
+                        const speedMs = (parseFloat(data.extras.pulse.speed) || 1) * 1000;
+                        const intervalMs = (parseFloat(data.extras.pulse.interval) || 0) * 1000;
+
+                        if (speedMs > 0 && amount !== 0) {
+                            let startDelay = 0;
+                            if (shouldWaitForStart) {
+                                startDelay = (Math.max(
+                                    data.start.slide.enabled ? (parseFloat(data.start.slide.duration) || 0) : 0,
+                                    data.start.fade.enabled ? (parseFloat(data.start.fade.speed) || 0) : 0,
+                                    data.start.animation.enabled ? 1.0 : 0
+                                ) * 1000) + 100;
+                            }
+
+                            const playPulse = () => {
+                                if (!document.body.contains(spriteCont) || (isTesting && isEnterPhase && hasEnterAnim && !force)) return; // Stop se o elemento for removido ou entrou fase enter
+                                const targetScaleX = (baseSX + amount) / baseSX;
+                                const targetScaleY = (baseSY + amount) / baseSY;
+
+                                const pulseEase = getCssEase(data.extras.pulse.ease || 'quadOut');
+                                const anim = spriteCont.animate([
+                                    { transform: `scale(1, 1)` },
+                                    { transform: `scale(${targetScaleX}, ${targetScaleY})`, offset: 0.5 },
+                                    { transform: `scale(1, 1)` }
+                                ], {
+                                    duration: speedMs * 2,
+                                    easing: pulseEase
+                                });
+
+                                anim.onfinish = () => {
+                                    if (!document.body.contains(spriteCont) || (isTesting && isEnterPhase && hasEnterAnim && !force)) return;
+                                    if (intervalMs > 0) {
+                                        const id = setTimeout(playPulse, intervalMs);
+                                        animIntervals.push(id);
+                                    } else {
+                                        playPulse();
+                                    }
+                                };
+                            };
+                            
+                            if (startDelay > 0) {
+                                const id = setTimeout(playPulse, startDelay);
+                                animIntervals.push(id);
+                            } else {
+                                playPulse();
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function onDrag(e) {
+            const screen = document.getElementById('preview-screen'); const rect = screen.getBoundingClientRect();
+            let dx = (e.clientX - startX) / rect.width; let dy = (e.clientY - startY) / rect.height;
+            
+            let rawX = origPosX + dx;
+            let rawY = origPosY + dy;
+
+            // Smart Guides e Snapping (10px de tolerância)
+            const snapThreshX = 10 / rect.width;
+            const snapThreshY = 10 / rect.height;
+
+            let snappedX = rawX;
+            let snappedY = rawY;
+            let showGuideV = false;
+            let showGuideH = false;
+            let guideX = 0;
+            let guideY = 0;
+
+            const snapPointsX = [0.5]; // Centro X da TV
+            const snapPointsY = [0.5]; // Centro Y da TV
+            imagesData.forEach((d, i) => {
+                if (i !== dragIndex) {
+                    snapPointsX.push(d.pos.x);
+                    snapPointsY.push(d.pos.y);
+                }
+            });
+
+            let closestDx = snapThreshX;
+            snapPointsX.forEach(px => {
+                if (Math.abs(rawX - px) < closestDx) {
+                    closestDx = Math.abs(rawX - px);
+                    snappedX = px;
+                    showGuideV = true;
+                    guideX = px * 1280;
+                }
+            });
+
+            let closestDy = snapThreshY;
+            snapPointsY.forEach(py => {
+                if (Math.abs(rawY - py) < closestDy) {
+                    closestDy = Math.abs(rawY - py);
+                    snappedY = py;
+                    showGuideH = true;
+                    guideY = py * 720;
+                }
+            });
+
+            // SHIFT desabilita snapping pra ajustes finos
+            if (e.shiftKey) {
+                snappedX = rawX;
+                snappedY = rawY;
+                showGuideV = false;
+                showGuideH = false;
+            }
+
+            imagesData[dragIndex].pos.x = Math.round(snappedX * 1000) / 1000;
+            imagesData[dragIndex].pos.y = Math.round(snappedY * 1000) / 1000;
+            
+            updatePreview();
+
+            const gh = document.getElementById('guide-h');
+            const gv = document.getElementById('guide-v');
+            if (gh) { gh.style.display = showGuideH ? 'block' : 'none'; gh.style.top = guideY + 'px'; }
+            if (gv) { gv.style.display = showGuideV ? 'block' : 'none'; gv.style.left = guideX + 'px'; }
+        }
+
+        function onHandleMove(e) {
+            let dx = (e.clientX - startX) * (0.005 / currentScale);
+            let dy = (e.clientY - startY) * (0.005 / currentScale);
+            if (dragMode === 'n' || dragMode === 's') imagesData[dragIndex].scale.y = Math.max(0.1, Math.round((origScaleY + (dragMode === 'n' ? -dy : dy)) * 100) / 100);
+            if (dragMode === 'e' || dragMode === 'w') imagesData[dragIndex].scale.x = Math.max(0.1, Math.round((origScaleX + (dragMode === 'w' ? -dx : dx)) * 100) / 100);
+            if (dragMode === 'se') {
+                let uniform = Math.max(dx, dy);
+                imagesData[dragIndex].scale.x = Math.max(0.1, Math.round((origScaleX + uniform) * 100) / 100);
+                imagesData[dragIndex].scale.y = Math.max(0.1, Math.round((origScaleY + uniform) * 100) / 100);
+            }
+            updatePreview();
+        }
+
+        function stopDrag() {
+            if (['n', 's', 'e', 'w', 'se'].includes(dragMode)) {
+                playStretchSound('stop');
+            }
+            document.onmousemove = null;
+            document.onmouseup = null;
+            document.body.classList.remove('dragging');
+            const gh = document.getElementById('guide-h');
+            const gv = document.getElementById('guide-v');
+            if (gh) gh.style.display = 'none';
+            if (gv) gv.style.display = 'none';
+            renderImages();
+            saveProject(); // Salva somente quando solta o mouse
+        }
+
+        function resetProject() {
+            if (!confirm('Tem certeza que deseja resetar? Todo o progresso não salvo será perdido.')) return;
+            isResetting = true;
+            localStorage.removeItem('ACT_Project_Cache');
+            window.location.reload();
+        }
+
+        function startTest() {
+            if (isTesting) return; isTesting = true; isEnterPhase = false; isStartPhase = true; selectedIdx = -1; updatePreview();
+            
+            // Lógica de Música
+            if (bgMusic) bgMusic.pause();
+            if (!testMusic) {
+                testMusic = new Audio('songs/freakyMenu.ogg');
+                testMusic.loop = true;
+                testMusic.volume = 0.3;
+            }
+            testMusic.currentTime = 0;
+            testMusic.play().catch(e => console.log("Test music blocked"));
+
+            document.body.classList.add('testing-mode');
+            document.getElementById('test-exit-btn').style.display = 'block';
+            document.getElementById('test-prompt-text').style.display = 'block';
+            setTimeout(autoScale, 10);
+            
+            imagesData.forEach((data, idx) => {
+                const el = document.getElementById('element-' + idx); if (!el) return;
+                el.style.transition = 'none';
+                if (data.start.slide.enabled) {
+                    let offX = 0, offY = 0;
+                    if (data.start.slide.from === "left") offX = -1500; else if (data.start.slide.from === "right") offX = 1500;
+                    else if (data.start.slide.from === "top") offY = -1000; else if (data.start.slide.from === "bottom") offY = 1000;
+                    el.style.transform = `translate(${offX}px, ${offY}px)`;
+                }
+                if (data.start.fade.enabled) {
+                    el.style.opacity = data.start.fade.from;
+                }
+            });
+            setTimeout(() => {
+                imagesData.forEach((data, idx) => {
+                    const el = document.getElementById('element-' + idx); if (!el) return;
+                    let transArr = [];
+                    if (data.start.slide.enabled) {
+                        const dur = data.start.slide.duration || 0.6;
+                        const ease = getCssEase(data.start.slide.ease);
+                        transArr.push(`transform ${dur}s ${ease}`);
+                        el.style.transform = `translate(0, 0)`;
+                    }
+                    if (data.start.fade.enabled) {
+                        const dur = data.start.fade.speed || 0.6;
+                        transArr.push(`opacity ${dur}s ease-in-out`);
+                        el.style.opacity = data.start.fade.to;
+                    }
+                    if (transArr.length > 0) el.style.transition = transArr.join(', ');
+                });
+
+                // A fase Start termina (isso desbloqueia a fase de Enter se ela fosse dependente, mas não chamamos updatePreview)
+                setTimeout(() => {
+                    isStartPhase = false;
+                }, 1000); // 1s genérico apenas para flag de estado
+            }, 50);
+            window.onkeydown = (e) => { if (e.key === "Enter") playEnterAnimation(); };
+        }
+
+        function playEnterAnimation() {
+            if (isEnterPhase) return; isEnterPhase = true; updatePreview();
+            document.getElementById('test-prompt-text').style.display = 'none';
+            
+            // Toca som de confirmação
+            new Audio('songs/confirmMenu.ogg').play().catch(e => console.log('Audio error:', e));
+            
+            // Flash Branco do FNF
+            const flash = document.getElementById('test-flash-screen');
+            if(flash) {
+                flash.style.transition = 'none';
+                flash.style.opacity = 1;
+                setTimeout(() => {
+                    flash.style.transition = 'opacity 2s ease-out';
+                    flash.style.opacity = 0;
+                }, 50);
+            }
+            setTimeout(() => {
+                imagesData.forEach((data, idx) => {
+                    const el = document.getElementById('element-' + idx); if (!el || !data.enter.enabled) return;
+                    let transArr = [];
+                    if (data.enter.slide.enabled) {
+                        const dur = data.enter.slide.duration || 0.8;
+                        const ease = getCssEase(data.enter.slide.ease);
+                        transArr.push(`transform ${dur}s ${ease}`);
+                        let offX = 0, offY = 0;
+                        if (data.enter.slide.to === "left") offX = -1500; else if (data.enter.slide.to === "right") offX = 1500;
+                        else if (data.enter.slide.to === "top") offY = -1000; else if (data.enter.slide.to === "bottom") offY = 1000;
+                        el.style.transform = `translate(${offX}px, ${offY}px)`;
+                    }
+                    if (data.enter.fade.enabled) {
+                        const dur = data.enter.fade.speed || 0.8;
+                        transArr.push(`opacity ${dur}s ease-in-out`);
+                        el.style.opacity = data.enter.fade.to;
+                    }
+                    if (transArr.length > 0) el.style.transition = transArr.join(', ');
+                });
+            }, 50);
+            setTimeout(() => { document.getElementById('test-black-screen').style.opacity = 1; setTimeout(() => stopTest(false), 1000); }, 1000);
+        }
+
+        function stopTest(isCancel = false) { 
+            if (isCancel && isTesting) {
+                new Audio('songs/cancelMenu.ogg').play().catch(e => console.log('Audio error:', e));
+            }
+
+            // Para música de teste e volta a normal
+            if (testMusic) testMusic.pause();
+            if (document.getElementById('glob-bgMusic').checked && bgMusic) {
+                bgMusic.play().catch(e => console.log("Music resume blocked"));
+            }
+
+            isTesting = false; isEnterPhase = false; isStartPhase = false; window.onkeydown = null; 
+            if(document.getElementById('test-black-screen')) document.getElementById('test-black-screen').style.opacity = 0; 
+            if(document.getElementById('test-flash-screen')) document.getElementById('test-flash-screen').style.opacity = 0;
+            document.body.classList.remove('testing-mode');
+            if(document.getElementById('test-exit-btn')) document.getElementById('test-exit-btn').style.display = 'none';
+            if(document.getElementById('test-prompt-text')) document.getElementById('test-prompt-text').style.display = 'none';
+            setTimeout(autoScale, 10);
+            updatePreview(); 
+        }
+
+        // =====================================================================
+        // Implementação exata das fórmulas do FlxEase.hx (HaxeFlixel)
+        // Portadas de Haxe para JS para máxima fidelidade com o jogo.
+        // =====================================================================
+        const FlxEase = {
+            PI2: Math.PI / 2,
+            EL: 2 * Math.PI / 0.45,
+            B1: 1 / 2.75, B2: 2 / 2.75, B3: 1.5 / 2.75,
+            B4: 2.5 / 2.75, B5: 2.25 / 2.75, B6: 2.625 / 2.75,
+            ELASTIC_AMPLITUDE: 1, ELASTIC_PERIOD: 0.4,
+
+            linear:     t => t,
+            quadIn:     t => t * t,
+            quadOut:    t => -t * (t - 2),
+            cubeIn:     t => t * t * t,
+            cubeOut:    t => 1 + (--t) * t * t,
+            quartIn:    t => t * t * t * t,
+            quartOut:   t => 1 - (t -= 1) * t * t * t,
+            quintIn:    t => t * t * t * t * t,
+            quintOut:   t => (t = t - 1) * t * t * t * t + 1,
+            sineIn:     t => -Math.cos((Math.PI / 2) * t) + 1,
+            sineOut:    t => Math.sin((Math.PI / 2) * t),
+            expoIn:     t => Math.pow(2, 10 * (t - 1)),
+            expoOut:    t => -Math.pow(2, -10 * t) + 1,
+            circIn:     t => -(Math.sqrt(1 - t * t) - 1),
+            circOut:    t => Math.sqrt(1 - (t - 1) * (t - 1)),
+            backIn:     t => t * t * (2.70158 * t - 1.70158),
+            backOut:    t => 1 - (--t) * (t) * (-2.70158 * t - 1.70158),
+            bounceOut: function(t) {
+                const B1=1/2.75, B2=2/2.75, B3=1.5/2.75, B4=2.5/2.75, B5=2.25/2.75, B6=2.625/2.75;
+                if (t < B1) return 7.5625 * t * t;
+                if (t < B2) return 7.5625 * (t - B3) * (t - B3) + 0.75;
+                if (t < B4) return 7.5625 * (t - B5) * (t - B5) + 0.9375;
+                return 7.5625 * (t - B6) * (t - B6) + 0.984375;
+            },
+            bounceIn: function(t) { return 1 - FlxEase.bounceOut(1 - t); },
+            elasticOut: function(t) {
+                const A = 1, P = 0.4;
+                return A * Math.pow(2, -10 * t) * Math.sin((t - (P / (2 * Math.PI) * Math.asin(1 / A))) * (2 * Math.PI) / P) + 1;
+            },
+            elasticIn: function(t) {
+                const A = 1, P = 0.4;
+                return -(A * Math.pow(2, 10 * (t -= 1)) * Math.sin((t - (P / (2 * Math.PI) * Math.asin(1 / A))) * (2 * Math.PI) / P));
+            }
+        };
+
+        // Gera um keyframe linear() com 60 pontos usando a fórmula exata do FlxEase
+        function flxEaseToLinear(fn, steps = 60) {
+            const pts = [];
+            for (let i = 0; i <= steps; i++) pts.push(fn(i / steps).toFixed(4));
+            return `linear(${pts.join(', ')})`;
+        }
+
+        function getCssEase(easeName) {
+            switch (easeName) {
+                case 'linear':     return 'linear';
+                case 'quadOut':    return flxEaseToLinear(FlxEase.quadOut);
+                case 'quadIn':     return flxEaseToLinear(FlxEase.quadIn);
+                case 'expoOut':    return flxEaseToLinear(FlxEase.expoOut);
+                case 'expoIn':     return flxEaseToLinear(FlxEase.expoIn);
+                case 'sineOut':    return flxEaseToLinear(FlxEase.sineOut);
+                case 'sineIn':     return flxEaseToLinear(FlxEase.sineIn);
+                case 'circOut':    return flxEaseToLinear(FlxEase.circOut);
+                case 'circIn':     return flxEaseToLinear(FlxEase.circIn);
+                case 'cubeOut':    return flxEaseToLinear(FlxEase.cubeOut);
+                case 'cubeIn':     return flxEaseToLinear(FlxEase.cubeIn);
+                case 'quartOut':   return flxEaseToLinear(FlxEase.quartOut);
+                case 'quartIn':    return flxEaseToLinear(FlxEase.quartIn);
+                case 'backOut':    return flxEaseToLinear(FlxEase.backOut);
+                case 'backIn':     return flxEaseToLinear(FlxEase.backIn);
+                case 'bounceOut':  return flxEaseToLinear(FlxEase.bounceOut);
+                case 'bounceIn':   return flxEaseToLinear(FlxEase.bounceIn);
+                case 'elasticOut': return flxEaseToLinear(FlxEase.elasticOut);
+                case 'elasticIn':  return flxEaseToLinear(FlxEase.elasticIn);
+                default:           return flxEaseToLinear(FlxEase.quadOut);
+            }
+        }
+
+        async function exportModZip() {
+            var zip = new JSZip();
+            const finalObj = { enableColorBackground: true, backgroundColor: document.getElementById('glob-bgColor').value, images: imagesData };
+
+            // Injeta o JSON diretamente no script para não precisar de arquivo externo
+            const jsonStr = JSON.stringify(finalObj).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+
+            const hxc = `// Advanced Custom Title - Feito Por TwGusta:
+// Editor Online: https://twgusta.github.io/fnfadvanced/
+// YouTube: https://youtube.com/@twgusta1
+//
+// Atualizações no Gamebanana:
+// https://gamebanana.com/mods/650802
+//
+// Você é livre para editar e adaptar o código.
+// Não faça upload do script sem permissão.
+// Sempre deixe os créditos no Gamebanana ou em outra plataforma.
+// Não apague estas linhas senão irá perderá o direito de usar o script.
+// divirta-se :)
+
+import flixel.FlxG;
+import flixel.FlxSprite;
+import flixel.util.FlxColor;
+import flixel.tweens.FlxTween;
+import flixel.tweens.FlxEase;
+import funkin.ui.title.TitleState;
+import funkin.modding.module.Module;
+import funkin.modding.events.UpdateScriptEvent;
+import funkin.Paths;
+import haxe.Json;
+import openfl.Assets;
+import flixel.util.FlxTimer;
+
+class AdvancedCustomTitle extends Module
+{
+    public function new() { super('ACT'); }
+    public var enableColorBackground:Bool = true;
+    public var backgroundColor:Int = 0xFFFFFFFF;
+    public var images:Array<Dynamic> = [];
+    var state2:Dynamic;
+    var added:Bool = false;
+    var enterPlayed:Bool = false;
+    var bgColor:FlxSprite;
+    var sprites:Array<FlxSprite> = [];
+    var baseX:Array<Float> = [];
+    var baseY:Array<Float> = [];
+    var baseScaleX:Array<Float> = [];
+    var baseScaleY:Array<Float> = [];
+    public var imageData:Array<Dynamic> = [];
+
+    function loadConfig()
+    {
+        var raw = '${jsonStr}';
+        var data:Dynamic = Json.parse(raw);
+        enableColorBackground = data.enableColorBackground;
+        backgroundColor = Std.parseInt(data.backgroundColor);
+        images = data.images;
+    }
+
+    override function onStateChangeEnd(event)
+    {
+        super.onStateChangeEnd(event);
+        loadConfig();
+        state2 = event.targetState;
+        added = false;
+        enterPlayed = false;
+        sprites = [];
+        baseX = []; baseY = []; baseScaleX = []; baseScaleY = []; imageData = [];
+    }
+
+    override function onUpdate(event:UpdateScriptEvent)
+    {
+        super.onUpdate(event);
+        if (!Std.isOfType(state2, TitleState)) return;
+        if (state2.skippedIntro && !added)
+        {
+            added = true;
+            if (enableColorBackground)
+            {
+                bgColor = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, backgroundColor);
+                bgColor.scrollFactor.set();
+                state2.add(bgColor);
+            }
+            // No FNF V-Slice (Base Game), a ordem de camadas é definida puramente pela ordem de add().
+            // Para que o Index 0 (topo da lista) apareça por cima, adicionamos do último ao primeiro.
+            images.reverse();
+            for (data in images)
+            {
+                var spr = new FlxSprite();
+                // Busca inteligente: Prioriza pasta do mod, cai para global se necessário
+                var assetPath:String = data.path;
+                var modPath:String = "title/" + data.path;
+                
+                // Em Hscript/Psych, checamos a existência do asset para decidir o caminho
+                if (Assets.exists(Paths.image(modPath))) {
+                    assetPath = modPath;
+                } else if (data.path == "logo") {
+                    assetPath = "logoBumpin";
+                } else if (data.path == "gf") {
+                    assetPath = "gfDanceTitle";
+                }
+
+                if (data.type == "spritesheet") spr.frames = Paths.getSparrowAtlas(assetPath);
+                else spr.loadGraphic(Paths.image(assetPath));
+                var sx = data.scale.x; var sy = data.scale.y;
+                spr.scale.set(sx, sy);
+                spr.updateHitbox();
+                var bx = (FlxG.width * data.pos.x) - spr.width / 2;
+                var by = (FlxG.height * data.pos.y) - spr.height / 2;
+                baseX.push(bx); baseY.push(by);
+                baseScaleX.push(sx); baseScaleY.push(sy);
+                imageData.push(data);
+                spr.x = bx; spr.y = by;
+                if (data.start.slide.enabled)
+                {
+                    switch (data.start.slide.from) {
+                        case "left": spr.x = -spr.width; case "right": spr.x = FlxG.width + spr.width;
+                        case "top": spr.y = -spr.height; case "bottom": spr.y = FlxG.height + spr.height;
+                    }
+                    FlxTween.tween(spr, { x: bx + data.start.slide.offset.x, y: by + data.start.slide.offset.y }, data.start.slide.duration, { ease: getEase(data.start.slide.ease) });
+                }
+                if (data.start.fade.enabled) {
+                    spr.alpha = data.start.fade.from;
+                    FlxTween.tween(spr, { alpha: data.start.fade.to }, data.start.fade.speed);
+                } else spr.alpha = data.alpha;
+                if (data.type == "spritesheet")
+                {
+                    if (data.start.animation.enabled) {
+                        spr.animation.addByPrefix("start", data.start.animation.name, data.start.animation.fps, data.start.animation.loop);
+                        spr.animation.play("start");
+                    }
+                    if (data.idle.enabled && data.idle.animation.enabled) {
+                        spr.animation.addByPrefix("idle", data.idle.animation.name, data.idle.animation.fps, data.idle.animation.loop);
+                    }
+                    if (data.enter.animation.enabled) {
+                        spr.animation.addByPrefix("enter", data.enter.animation.name, data.enter.animation.fps, data.enter.animation.loop);
+                    }
+                    if (!data.start.animation.enabled && data.idle.animation.enabled) {
+                        spr.animation.play("idle");
+                    }
+                }
+                spr.scrollFactor.set();
+                state2.add(spr);
+                sprites.push(spr);
+                
+                if (data.extras.pulse.enabled) {
+                    if (data.extras.pulse.force) {
+                        startPulse(spr, sx, sy, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor);
+                    } else {
+                        var delay:Float = 0.0;
+                        if (data.start.slide.enabled && data.start.slide.duration > delay) delay = data.start.slide.duration;
+                        if (data.start.fade.enabled && data.start.fade.speed > delay) delay = data.start.fade.speed;
+                        
+                        if (delay > 0) {
+                            new FlxTimer().start(delay, function(_) {
+                                if (data.type == "spritesheet" && data.start.animation.enabled) {
+                                    // A lógica do onUpdate cuidará disso
+                                } else {
+                                    startPulse(spr, sx, sy, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor);
+                                }
+                            });
+                        } else if (data.type != "spritesheet" || !data.start.animation.enabled) {
+                            startPulse(spr, sx, sy, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor);
+                        }
+                    }
+                }
+            } // fecha for (data in images)
+        } // fecha if (skippedIntro && !added)
+
+        // === Lógica contínua: roda todo frame ===
+        for (i in 0...sprites.length)
+        {
+            var spr = sprites[i]; var data = imageData[i];
+            // Transição Start -> Idle
+            if (data.type == "spritesheet" && data.idle.enabled && data.idle.animation.enabled) {
+                if (spr.animation.curAnim != null && spr.animation.curAnim.name == "start" && spr.animation.curAnim.finished) {
+                    if (spr.animation.getByName("idle") != null) spr.animation.play("idle");
+                    if (data.extras.pulse.enabled && !data.extras.pulse.force) {
+                        startPulse(spr, data.scale.x, data.scale.y, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor);
+                    }
+                }
+            }
+        }
+        // === Detecção do Enter (roda UMA vez) ===
+        if (state2.transitioning && !enterPlayed)
+        {
+            enterPlayed = true;
+            for (i in 0...sprites.length)
+            {
+                var spr = sprites[i]; var data = imageData[i];
+                var hasEnterAnim = data.enter.slide.enabled || data.enter.fade.enabled || data.enter.animation.enabled;
+                if (hasEnterAnim && data.extras.pulse.enabled && !data.extras.pulse.force) {
+                    FlxTween.cancelTweensOf(spr.scale);
+                    spr.scale.set(baseScaleX[i], baseScaleY[i]);
+                }
+                if (!hasEnterAnim) continue;
+                FlxTween.cancelTweensOf(spr); // Fix para o snapback se apertar enter muito rápido
+                var tx = baseX[i]; var ty = baseY[i];
+                if (data.enter.slide.enabled) {
+                    switch (data.enter.slide.to) {
+                        case "left": tx = -spr.width; case "right": tx = FlxG.width + spr.width;
+                        case "top": ty = -spr.height; case "bottom": ty = FlxG.height + spr.height;
+                    }
+                }
+                if (data.enter.animation.enabled && data.type == "spritesheet") spr.animation.play("enter");
+                if (data.enter.fade.enabled) FlxTween.tween(spr, { alpha: data.enter.fade.to }, data.enter.fade.speed);
+                if (data.enter.slide.enabled) FlxTween.tween(spr, { x: tx + data.enter.slide.offset.x, y: ty + data.enter.slide.offset.y }, data.enter.slide.duration, { ease: getEase(data.enter.slide.ease) });
+            }
+        }
+    } // fecha onUpdate
+    function startPulse(spr:FlxSprite, baseSX:Float, baseSY:Float, amount:Float, speed:Float, interval:Float, ease:Dynamic, anchor:String)
+    {
+        var doPulse:Void->Void = null;
+        doPulse = function() {
+            FlxTween.tween(spr.scale, { x: baseSX + amount, y: baseSY + amount }, speed, { ease: ease, onComplete: function(_) {
+                FlxTween.tween(spr.scale, { x: baseSX, y: baseSY }, speed, { ease: ease, onComplete: function(_) {
+                    if (interval > 0) new FlxTimer().start(interval, function(_) { doPulse(); });
+                    else doPulse();
+                }});
+            }});
+        }
+        spr.scale.set(baseSX, baseSY);
+        spr.updateHitbox();
+        
+        if (anchor == "bottom") spr.origin.set(spr.frameWidth / 2, spr.frameHeight);
+        else if (anchor == "top") spr.origin.set(spr.frameWidth / 2, 0);
+        else if (anchor == "left") spr.origin.set(0, spr.frameHeight / 2);
+        else if (anchor == "right") spr.origin.set(spr.frameWidth, spr.frameHeight / 2);
+        else spr.centerOrigin();
+
+        doPulse();
+    }
+    function getEase(name:String) {
+        return switch (name) { 
+            case "bounceOut": FlxEase.bounceOut; case "bounceIn": FlxEase.bounceIn;
+            case "quadOut": FlxEase.quadOut; case "quadIn": FlxEase.quadIn;
+            case "expoOut": FlxEase.expoOut; case "expoIn": FlxEase.expoIn;
+            case "elasticOut": FlxEase.elasticOut; case "elasticIn": FlxEase.elasticIn;
+            case "backOut": FlxEase.backOut; case "backIn": FlxEase.backIn;
+            case "sineOut": FlxEase.sineOut; case "sineIn": FlxEase.sineIn;
+            default: FlxEase.linear; 
+        }
+    }
+}`;
+            zip.file("scripts/AdvancedCustomTitle.hxc", hxc);
+            const imgFolder = zip.folder("images/title");
+
+            // Arquivos upados manualmente pelo usuário (prioridade)
+            const includedKeys = new Set();
+            for (let key in uploadedFiles) {
+                const f = uploadedFiles[key];
+                if (f.rawFilePng) { imgFolder.file(key + '.png', f.rawFilePng); includedKeys.add(key); }
+                if (f.rawFileXml) { imgFolder.file(key + '.xml', f.rawFileXml); }
+            }
+
+            // Assets do template ainda não upados: baixa e inclui no ZIP automaticamente
+            const fetches = imagesData.map(async (data) => {
+                const key = data.path;
+                if (includedKeys.has(key)) return;
+                try {
+                    const pngRes = await fetch('images/title/' + key + '.png');
+                    if (pngRes.ok) imgFolder.file(key + '.png', await pngRes.blob());
+                    if (data.type === 'spritesheet') {
+                        const xmlRes = await fetch('images/title/' + key + '.xml');
+                        if (xmlRes.ok) imgFolder.file(key + '.xml', await xmlRes.blob());
+                    }
+                } catch (e) { console.warn('Asset não encontrado para bundling:', key); }
+            });
+
+            await Promise.all(fetches);
+            zip.generateAsync({ type: "blob" }).then(c => { const u = URL.createObjectURL(c); const a = document.createElement("a"); a.href = u; a.download = "AdvancedCustomTitleMod.zip"; a.click(); });
+        }
+
+        const defaultJSON = {"enableColorBackground":true,"backgroundColor":"0xFFFFFFFF","images":[{"path":"logo","type":"png","pos":{"x":0.244,"y":0.36},"scale":{"x":0.5,"y":0.5},"alpha":1,"zIndex":10,"start":{"animation":{"enabled":false,"name":"Idle0","fps":24,"loop":false,"offset":{"x":-40,"y":0}},"fade":{"enabled":true,"from":0,"to":1,"speed":1},"slide":{"enabled":false,"from":"none","duration":1,"ease":"bounceOut","offset":{"x":0,"y":0}}},"idle":{"enabled":true,"animation":{"enabled":true,"name":"Idle0","fps":24,"loop":true,"offset":{"x":0,"y":0}}},"enter":{"enabled":false,"animation":{"enabled":false,"name":"BF HEY!!0","fps":24,"offset":{"x":30,"y":0}},"fade":{"enabled":false,"to":0,"speed":2},"slide":{"enabled":false,"to":"none","duration":2,"ease":"linear","offset":{"x":0,"y":0}}},"extras":{"pulse":{"enabled":true,"scale":0.1,"speed":0.1,"interval":0.4,"ease":"quadOut","anchor":"center","force":true}},"_tab":"geral","_basicOpen":true},{"path":"titleEnter","type":"spritesheet","pos":{"x":0.5,"y":0.877},"scale":{"x":0.75,"y":0.75},"alpha":1,"zIndex":100,"start":{"animation":{"enabled":true,"name":"Press Enter to Begin0","fps":24,"loop":false,"offset":{"x":0,"y":0}},"fade":{"enabled":true,"from":0,"to":1,"speed":1},"slide":{"enabled":true,"from":"bottom","duration":0.6,"ease":"quadOut","offset":{"x":0,"y":0}}},"idle":{"enabled":true,"animation":{"enabled":true,"name":"Press Enter to Begin0","fps":24,"loop":true,"offset":{"x":0,"y":0}}},"enter":{"enabled":false,"animation":{"enabled":true,"name":"ENTER PRESSED","fps":24,"offset":{"x":0,"y":0}},"fade":{"enabled":false,"to":0,"speed":2},"slide":{"enabled":false,"to":"none","duration":1,"ease":"quadOut","offset":{"x":0,"y":0}}},"extras":{"pulse":{"enabled":true,"scale":0.1,"speed":1,"interval":0,"ease":"quadOut","anchor":"center","force":true}},"_tab":"anim","_basicOpen":false},{"path":"gf","type":"spritesheet","pos":{"x":0.741,"y":0.428},"scale":{"x":0.87,"y":0.87},"alpha":1,"zIndex":10,"start":{"animation":{"enabled":true,"name":"gfDance","fps":24,"loop":false,"offset":{"x":0,"y":0}},"fade":{"enabled":false,"from":0,"to":1,"speed":0.8},"slide":{"enabled":false,"from":"none","duration":0.8,"ease":"bounceOut","offset":{"x":0,"y":0}}},"idle":{"enabled":true,"animation":{"enabled":true,"name":"gfDance0","fps":24,"loop":true,"offset":{"x":0,"y":0}}},"enter":{"enabled":false,"animation":{"enabled":true,"name":"BF HEY!!0","fps":24,"offset":{"x":30,"y":0}},"fade":{"enabled":false,"to":0,"speed":0.6},"slide":{"enabled":false,"to":"none","duration":0.6,"ease":"linear","offset":{"x":0,"y":0}}},"extras":{"pulse":{"enabled":false,"scale":0.1,"speed":0.1,"interval":1,"ease":"quadOut","anchor":"center"}}},{"path":"street","type":"png","pos":{"x":0.5,"y":0.5},"scale":{"x":1,"y":1},"alpha":1,"zIndex":6,"start":{"animation":{"enabled":false,"name":"Idle0","fps":24,"loop":false,"offset":{"x":-40,"y":0}},"fade":{"enabled":false,"from":0,"to":1,"speed":0.8},"slide":{"enabled":false,"from":"none","duration":0.8,"ease":"bounceOut","offset":{"x":0,"y":0}}},"idle":{"enabled":false,"animation":{"enabled":true,"name":"Idle0","fps":24,"loop":true,"offset":{"x":0,"y":0}}},"enter":{"enabled":false,"animation":{"enabled":true,"name":"BF HEY!!0","fps":24,"offset":{"x":30,"y":0}},"fade":{"enabled":false,"to":0,"speed":0.6},"slide":{"enabled":false,"to":"none","duration":0.6,"ease":"linear","offset":{"x":0,"y":0}}},"extras":{"pulse":{"enabled":false,"scale":0.1,"speed":0.1,"interval":1,"ease":"quadOut","anchor":"center"}}},{"path":"train","type":"png","pos":{"x":1.65,"y":0.5},"scale":{"x":0.9,"y":0.9},"alpha":1,"zIndex":4,"start":{"animation":{"enabled":false,"name":"Idle0","fps":24,"loop":false,"offset":{"x":-40,"y":0}},"fade":{"enabled":false,"from":0,"to":1,"speed":0.8},"slide":{"enabled":true,"from":"right","duration":2,"ease":"quadOut","offset":{"x":0,"y":0}}},"idle":{"enabled":false,"animation":{"enabled":true,"name":"Idle0","fps":24,"loop":true,"offset":{"x":0,"y":0}}},"enter":{"enabled":true,"animation":{"enabled":true,"name":"BF HEY!!0","fps":24,"offset":{"x":30,"y":0}},"fade":{"enabled":false,"to":0,"speed":0.7},"slide":{"enabled":true,"to":"left","duration":0.7,"ease":"linear","offset":{"x":0,"y":0}}},"extras":{"pulse":{"enabled":false,"scale":0.1,"speed":0.1,"interval":1,"ease":"quadOut","anchor":"center"}},"_tab":"anim","_basicOpen":true,"_spriteOpen":false},{"path":"behindTrain","type":"png","pos":{"x":0.5,"y":0.5},"scale":{"x":1,"y":1},"alpha":1,"zIndex":5,"start":{"animation":{"enabled":false,"name":"Idle0","fps":24,"loop":false,"offset":{"x":-40,"y":0}},"fade":{"enabled":false,"from":0,"to":1,"speed":0.8},"slide":{"enabled":false,"from":"none","duration":0.8,"ease":"bounceOut","offset":{"x":0,"y":0}}},"idle":{"enabled":false,"animation":{"enabled":true,"name":"Idle0","fps":24,"loop":true,"offset":{"x":0,"y":0}}},"enter":{"enabled":false,"animation":{"enabled":true,"name":"BF HEY!!0","fps":24,"offset":{"x":30,"y":0}},"fade":{"enabled":false,"to":0,"speed":0.6},"slide":{"enabled":false,"to":"none","duration":0.6,"ease":"linear","offset":{"x":0,"y":0}}},"extras":{"pulse":{"enabled":false,"scale":0.1,"speed":0.1,"interval":1,"ease":"quadOut","anchor":"center"}}},{"path":"win","type":"png","pos":{"x":0.5,"y":0.5},"scale":{"x":0.9,"y":0.9},"alpha":1,"zIndex":3,"start":{"animation":{"enabled":false,"name":"Idle0","fps":24,"loop":false,"offset":{"x":-40,"y":0}},"fade":{"enabled":false,"from":0,"to":1,"speed":0.8},"slide":{"enabled":false,"from":"none","duration":0.8,"ease":"bounceOut","offset":{"x":0,"y":0}}},"idle":{"enabled":false,"animation":{"enabled":true,"name":"Idle0","fps":24,"loop":true,"offset":{"x":0,"y":0}}},"enter":{"enabled":false,"animation":{"enabled":true,"name":"BF HEY!!0","fps":24,"offset":{"x":30,"y":0}},"fade":{"enabled":false,"to":0,"speed":0.6},"slide":{"enabled":false,"to":"none","duration":0.6,"ease":"linear","offset":{"x":0,"y":0}}},"extras":{"pulse":{"enabled":false,"scale":0.1,"speed":0.1,"interval":1,"ease":"quadOut","anchor":"center"}}},{"path":"city","type":"png","pos":{"x":0.5,"y":0.5},"scale":{"x":0.9,"y":0.9},"alpha":1,"zIndex":2,"start":{"animation":{"enabled":false,"name":"Idle0","fps":24,"loop":false,"offset":{"x":-40,"y":0}},"fade":{"enabled":false,"from":0,"to":1,"speed":0.8},"slide":{"enabled":false,"from":"none","duration":0.8,"ease":"bounceOut","offset":{"x":0,"y":0}}},"idle":{"enabled":false,"animation":{"enabled":true,"name":"Idle0","fps":24,"loop":true,"offset":{"x":0,"y":0}}},"enter":{"enabled":false,"animation":{"enabled":true,"name":"BF HEY!!0","fps":24,"offset":{"x":30,"y":0}},"fade":{"enabled":false,"to":0,"speed":0.6},"slide":{"enabled":false,"to":"none","duration":0.6,"ease":"linear","offset":{"x":0,"y":0}}},"extras":{"pulse":{"enabled":false,"scale":0.1,"speed":0.1,"interval":1,"ease":"quadOut","anchor":"center"}}},{"path":"sky","type":"png","pos":{"x":0.49,"y":0.6},"scale":{"x":1.1,"y":1},"alpha":1,"zIndex":1,"start":{"animation":{"enabled":false,"name":"Idle0","fps":24,"loop":false,"offset":{"x":-40,"y":0}},"fade":{"enabled":false,"from":0,"to":1,"speed":0.8},"slide":{"enabled":false,"from":"none","duration":0.8,"ease":"bounceOut","offset":{"x":0,"y":0}}},"idle":{"enabled":false,"animation":{"enabled":true,"name":"Idle0","fps":24,"loop":true,"offset":{"x":0,"y":0}}},"enter":{"enabled":false,"animation":{"enabled":true,"name":"BF HEY!!0","fps":24,"offset":{"x":30,"y":0}},"fade":{"enabled":false,"to":0,"speed":0.6},"slide":{"enabled":false,"to":"none","duration":0.6,"ease":"linear","offset":{"x":0,"y":0}}},"extras":{"pulse":{"enabled":false,"scale":0.1,"speed":0.1,"interval":1,"ease":"quadOut","anchor":"center"}}}]};
+
+        function getImageDimensions(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve({ w: img.width, h: img.height });
+                img.onerror = reject;
+                img.src = url;
+            });
+        }
+
+        async function preloadDefaults() {
+            imagesData = JSON.parse(JSON.stringify(defaultJSON.images));
+            renderImages(); // Renderiza logo para não ficar tela preta
+
+            for (let data of imagesData) {
+                try {
+                    let p = data.path;
+                    if (!uploadedFiles[p]) uploadedFiles[p] = {};
+                    const url = 'images/title/' + p + '.png';
+                    const dims = await getImageDimensions(url).catch(() => ({ w: 150, h: 150 }));
+
+                    uploadedFiles[p].pngDataUrl = url;
+                    uploadedFiles[p].width = dims.w;
+                    uploadedFiles[p].height = dims.h;
+
+                    if (data.type === 'spritesheet') {
+                        const r = await fetch('images/title/' + p + '.xml').catch(() => null);
+                        if (r && r.ok) uploadedFiles[p].xmlString = await r.text();
+                    }
+                } catch (e) { console.warn("Erro no preload:", e); }
+            }
+            renderImages(); // Re-renderiza com as imagens se carregaram
+        }
+    </script>
+</body>
+
+</html>
