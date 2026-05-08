@@ -94,7 +94,7 @@
         .preview-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #070010; background-image: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(139,19,240,0.04) 3px, rgba(139,19,240,0.04) 4px); position: relative; padding: 40px; overflow: hidden; }
         .preview-wrapper { position: relative; box-shadow: 0 0 0 3px var(--fnf-border), 0 0 0 5px #000, 0 0 40px rgba(139,19,240,0.5); transform-origin: center center; background: #000; }
         #preview-screen { width: 1280px; height: 720px; position: relative; overflow: hidden; }
-        .preview-element { position: absolute; cursor: url('ui/cursorGrab.png') 8 8, move; user-select: none; }
+        .preview-element { position: absolute; cursor: url('ui/cursorGrab.png') 8 8, move; user-select: none; touch-action: none; -webkit-user-drag: none; }
         .preview-element.selected { outline: 2px dashed var(--fnf-accent); }
 
         .handle { position: absolute; background: var(--fnf-accent); border: 2px solid #000; width: 12px; height: 12px; border-radius: 0; display: none; z-index: 100; }
@@ -105,8 +105,8 @@
         .handle.w { left: -6px; top: calc(50% - 6px); cursor: ew-resize; }
         .handle.se { bottom: -8px; right: -8px; cursor: nwse-resize; background: var(--fnf-yellow); width: 16px; height: 16px; }
 
-        .sprite-container { position: relative; width: 100%; height: 100%; overflow: hidden; transform-origin: center center; pointer-events: none; }
-        .sprite-layer { position: absolute; background-repeat: no-repeat; background-size: auto; pointer-events: none; }
+        .sprite-container { position: relative; width: 100%; height: 100%; overflow: hidden; transform-origin: center center; -webkit-user-drag: none; }
+        .sprite-layer { position: absolute; background-repeat: no-repeat; background-size: auto; -webkit-user-drag: none; }
 
         .tab-btn { background: rgba(139,19,240,0.1); border: 2px solid rgba(139,19,240,0.3); color: var(--fnf-dim); padding: 7px 8px; font-size: 15px; font-family: 'VT323', monospace; cursor: pointer; border-radius: 0; flex: 1; text-transform: uppercase; letter-spacing: 1px; transition: all 0.15s; }
         .tab-btn:hover { border-color: var(--fnf-border); color: white; }
@@ -161,7 +161,7 @@
         .tutorial-text { font-size: 20px; color: var(--fnf-cyan); margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
         .tutorial-nav { display: flex; justify-content: space-between; gap: 10px; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .mobile-handle { display: none; }
+        .mobile-handle-wrapper { display: none; }
 
         @media (max-width: 768px) {
             body {
@@ -230,13 +230,23 @@
                 border-radius: 15px 15px 0 0;
                 border-top: 4px solid var(--fnf-border);
             }
+            .mobile-handle-wrapper {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 100%;
+                height: 40px;
+                margin-top: -5px;
+                margin-bottom: 5px;
+                cursor: pointer;
+                touch-action: none;
+            }
             .mobile-handle {
                 display: block;
-                width: 40px;
+                width: 60px;
                 height: 6px;
                 background: rgba(255,255,255,0.4);
                 border-radius: 5px;
-                margin: 0 auto 15px auto;
             }
 
             /* Modais e outros */
@@ -275,7 +285,9 @@
         </div>
 
         <div class="sidebar-content" id="sidebar-content">
-            <div class="mobile-handle" id="mobile-handle"></div>
+            <div class="mobile-handle-wrapper" id="mobile-handle">
+                <div class="mobile-handle"></div>
+            </div>
             <div class="section-title" data-i18n="settings_title">Config. Globais</div>
             <div class="form-row">
                 <div class="form-group">
