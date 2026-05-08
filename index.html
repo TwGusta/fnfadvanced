@@ -275,7 +275,7 @@
         </div>
 
         <div class="sidebar-content" id="sidebar-content">
-            <div class="mobile-handle" id="mobile-handle" onclick="document.getElementById('sidebar-content').classList.toggle('expanded')"></div>
+            <div class="mobile-handle" id="mobile-handle"></div>
             <div class="section-title" data-i18n="settings_title">Config. Globais</div>
             <div class="form-row">
                 <div class="form-group">
@@ -669,7 +669,8 @@
         function autoScale() {
             const area = document.getElementById('preview-area');
             const wrapper = document.getElementById('preview-wrapper');
-            const margin = 120;
+            const isMobile = window.innerWidth <= 768;
+            const margin = isMobile ? 16 : 120;
             const targetW = 1280; const targetH = 720;
             const availableW = area.clientWidth - margin;
             const availableH = area.clientHeight - margin;
@@ -726,6 +727,22 @@
             }
             autoScale();
             initMusic();
+
+            // Swipe para expandir/colapsar painel no mobile
+            const handle = document.getElementById('mobile-handle');
+            const panel = document.getElementById('sidebar-content');
+            if (handle && panel) {
+                let swipeStartY = null;
+                handle.addEventListener('touchstart', e => { swipeStartY = e.touches[0].clientY; }, { passive: true });
+                handle.addEventListener('touchend', e => {
+                    if (swipeStartY === null) return;
+                    const dy = swipeStartY - e.changedTouches[0].clientY;
+                    if (dy > 20) panel.classList.add('expanded');    // swipe pra cima = expande
+                    else if (dy < -20) panel.classList.remove('expanded'); // swipe pra baixo = fecha
+                    else panel.classList.toggle('expanded');          // tap = alterna
+                    swipeStartY = null;
+                }, { passive: true });
+            }
         };
 
 
@@ -1262,10 +1279,11 @@
                         document.body.classList.add('dragging');
                         playStretchSound('start');
                         document.onmousemove = onHandleMove; document.onmouseup = stopDrag;
-                        document.ontouchmove = onHandleMove; document.ontouchend = stopDrag;
+                        document.addEventListener('touchmove', onHandleMove, { passive: false });
+                        document.addEventListener('touchend', stopDrag, { once: true });
                     };
                     h.onmousedown = handleStart;
-                    h.ontouchstart = handleStart;
+                    h.addEventListener('touchstart', handleStart, { passive: false });
                     el.appendChild(h);
                 });
 
@@ -1286,13 +1304,15 @@
                     origPosX = data.pos.x; origPosY = data.pos.y;
                     document.body.classList.add('dragging');
                     document.onmousemove = onDrag; document.onmouseup = stopDrag;
-                    document.ontouchmove = onDrag; document.ontouchend = stopDrag;
+                    document.addEventListener('touchmove', onDrag, { passive: false });
+                    document.addEventListener('touchend', stopDrag, { once: true });
                 };
                 el.onmousedown = elDragStart;
 
                 let pressTimer;
-                el.ontouchstart = (e) => {
+                const elTouchStart = (e) => {
                     if (e.touches.length > 1) return;
+                    e.preventDefault(); // ESSENCIAL: impede scroll da página
                     pressTimer = setTimeout(() => {
                         if (isTesting) return;
                         selectObject(idx);
@@ -1302,9 +1322,10 @@
                     }, 600);
                     elDragStart(e);
                 };
-                el.ontouchend = () => clearTimeout(pressTimer);
-                el.ontouchcancel = () => clearTimeout(pressTimer);
-                el.addEventListener('touchmove', () => clearTimeout(pressTimer), {passive: true});
+                el.addEventListener('touchstart', elTouchStart, { passive: false });
+                el.addEventListener('touchend', () => clearTimeout(pressTimer), { passive: true });
+                el.addEventListener('touchcancel', () => clearTimeout(pressTimer), { passive: true });
+                el.addEventListener('touchmove', () => clearTimeout(pressTimer), { passive: true });
 
                 let fileObj = uploadedFiles[data.path];
                 let baseW = 150, baseH = 150, frameX = 0, frameY = 0, sprW = 150, sprH = 150;
@@ -1571,8 +1592,8 @@
             }
             document.onmousemove = null;
             document.onmouseup = null;
-            document.ontouchmove = null;
-            document.ontouchend = null;
+            document.removeEventListener('touchmove', onDrag);
+            document.removeEventListener('touchmove', onHandleMove);
             document.body.classList.remove('dragging');
             const gh = document.getElementById('guide-h');
             const gv = document.getElementById('guide-v');
