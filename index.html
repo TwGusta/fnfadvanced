@@ -812,6 +812,7 @@
             imagesData[index].path = nameWithoutExt;
             renderImages();
             updatePreview();
+            saveProject();
         }
 
         async function uploadObjectXml(index, file) {
@@ -837,6 +838,7 @@
 
             renderImages();
             updatePreview();
+            saveProject();
         }
 
         function readFileAsDataURL(file) { return new Promise(r => { const f = new FileReader(); f.onload = (e) => r(e.target.result); f.readAsDataURL(file); }); }
@@ -870,11 +872,25 @@
         }
 
         function hexToCss(hexStr) {
-            if (hexStr.length === 10) {
-                const a = parseInt(hexStr.substr(2, 2), 16) / 255;
-                const r = parseInt(hexStr.substr(4, 2), 16);
-                const g = parseInt(hexStr.substr(6, 2), 16);
-                const b = parseInt(hexStr.substr(8, 2), 16);
+            let hex = hexStr.trim().replace(/^0x|^#/, '');
+            if (hex.length === 6) {
+                const r = parseInt(hex.substr(0, 2), 16);
+                const g = parseInt(hex.substr(2, 2), 16);
+                const b = parseInt(hex.substr(4, 2), 16);
+                return `rgb(${r},${g},${b})`;
+            } else if (hex.length === 8) {
+                let a, r, g, b;
+                if (hexStr.trim().startsWith('0x')) {
+                    a = parseInt(hex.substr(0, 2), 16) / 255;
+                    r = parseInt(hex.substr(2, 2), 16);
+                    g = parseInt(hex.substr(4, 2), 16);
+                    b = parseInt(hex.substr(6, 2), 16);
+                } else {
+                    r = parseInt(hex.substr(0, 2), 16);
+                    g = parseInt(hex.substr(2, 2), 16);
+                    b = parseInt(hex.substr(4, 2), 16);
+                    a = parseInt(hex.substr(6, 2), 16) / 255;
+                }
                 return `rgba(${r},${g},${b},${a})`;
             }
             return '#fff';
@@ -1403,6 +1419,15 @@
                                 sprW = f.width; sprH = f.height;
                                 frameX = -f.frameX; frameY = -f.frameY;
 
+                                el.dataset.baseW = baseW;
+                                el.dataset.baseH = baseH;
+                                spriteLayer.dataset.sprW = sprW;
+                                spriteLayer.dataset.sprH = sprH;
+                                spriteLayer.dataset.frameX = frameX;
+                                spriteLayer.dataset.frameY = frameY;
+                                spriteLayer.dataset.fx = f.x;
+                                spriteLayer.dataset.fy = f.y;
+
                                 el.style.width = (baseW * data.scale.x) + 'px';
                                 el.style.height = (baseH * data.scale.y) + 'px';
                                 spriteLayer.style.width = (sprW * data.scale.x) + 'px';
@@ -1436,6 +1461,8 @@
                         }
                     } else {
                         baseW = fileObj.width; baseH = fileObj.height;
+                        el.dataset.baseW = baseW;
+                        el.dataset.baseH = baseH;
                         el.style.width = (baseW * data.scale.x) + 'px';
                         el.style.height = (baseH * data.scale.y) + 'px';
                         spriteLayer.style.width = '100%'; spriteLayer.style.height = '100%';
@@ -1444,6 +1471,8 @@
                         el.style.top = ((720 * data.pos.y) - (baseH * data.scale.y / 2)) + 'px';
                     }
                 } else {
+                    el.dataset.baseW = 150;
+                    el.dataset.baseH = 150;
                     el.style.width = (150 * data.scale.x) + 'px';
                     el.style.height = (150 * data.scale.y) + 'px';
                     spriteLayer.style.backgroundColor = 'rgba(255,255,255,0.05)';
@@ -1581,7 +1610,14 @@
             imagesData[dragIndex].pos.x = Math.round(snappedX * 1000) / 1000;
             imagesData[dragIndex].pos.y = Math.round(snappedY * 1000) / 1000;
             
-            updatePreview();
+            // Atualiza diretamente no DOM sem recriar os elementos (evitando congelar o toque no mobile)
+            const el = document.getElementById('element-' + dragIndex);
+            if (el) {
+                const w = parseFloat(el.style.width) || 150;
+                const h = parseFloat(el.style.height) || 150;
+                el.style.left = ((1280 * snappedX) - (w / 2)) + 'px';
+                el.style.top = ((720 * snappedY) - (h / 2)) + 'px';
+            }
 
             const gh = document.getElementById('guide-h');
             const gv = document.getElementById('guide-v');
@@ -1595,14 +1631,56 @@
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             let dx = (clientX - startX) * (0.005 / currentScale);
             let dy = (clientY - startY) * (0.005 / currentScale);
-            if (dragMode === 'n' || dragMode === 's') imagesData[dragIndex].scale.y = Math.max(0.1, Math.round((origScaleY + (dragMode === 'n' ? -dy : dy)) * 100) / 100);
-            if (dragMode === 'e' || dragMode === 'w') imagesData[dragIndex].scale.x = Math.max(0.1, Math.round((origScaleX + (dragMode === 'w' ? -dx : dx)) * 100) / 100);
+            
+            const data = imagesData[dragIndex];
+            if (dragMode === 'n' || dragMode === 's') data.scale.y = Math.max(0.1, Math.round((origScaleY + (dragMode === 'n' ? -dy : dy)) * 100) / 100);
+            if (dragMode === 'e' || dragMode === 'w') data.scale.x = Math.max(0.1, Math.round((origScaleX + (dragMode === 'w' ? -dx : dx)) * 100) / 100);
             if (dragMode === 'se') {
                 let uniform = Math.max(dx, dy);
-                imagesData[dragIndex].scale.x = Math.max(0.1, Math.round((origScaleX + uniform) * 100) / 100);
-                imagesData[dragIndex].scale.y = Math.max(0.1, Math.round((origScaleY + uniform) * 100) / 100);
+                data.scale.x = Math.max(0.1, Math.round((origScaleX + uniform) * 100) / 100);
+                data.scale.y = Math.max(0.1, Math.round((origScaleY + uniform) * 100) / 100);
             }
-            updatePreview();
+            
+            // Atualiza diretamente no DOM sem recriar os elementos (evitando congelar o toque no mobile)
+            const el = document.getElementById('element-' + dragIndex);
+            if (el) {
+                let fileObj = uploadedFiles[data.path];
+                let baseW = 150, baseH = 150;
+                
+                baseW = parseFloat(el.dataset.baseW) || baseW;
+                baseH = parseFloat(el.dataset.baseH) || baseH;
+
+                const newW = baseW * data.scale.x;
+                const newH = baseH * data.scale.y;
+
+                el.style.width = newW + 'px';
+                el.style.height = newH + 'px';
+                el.style.left = ((1280 * data.pos.x) - (newW / 2)) + 'px';
+                el.style.top = ((720 * data.pos.y) - (newH / 2)) + 'px';
+
+                const spriteLayer = el.querySelector('.sprite-layer');
+                if (spriteLayer && fileObj) {
+                    if (data.type === 'spritesheet' && fileObj.xmlString) {
+                        const sprW = parseFloat(spriteLayer.dataset.sprW) || baseW;
+                        const sprH = parseFloat(spriteLayer.dataset.sprH) || baseH;
+                        const frameX = parseFloat(spriteLayer.dataset.frameX) || 0;
+                        const frameY = parseFloat(spriteLayer.dataset.frameY) || 0;
+                        const fx = parseFloat(spriteLayer.dataset.fx) || 0;
+                        const fy = parseFloat(spriteLayer.dataset.fy) || 0;
+
+                        spriteLayer.style.width = (sprW * data.scale.x) + 'px';
+                        spriteLayer.style.height = (sprH * data.scale.y) + 'px';
+                        spriteLayer.style.left = (frameX * data.scale.x) + 'px';
+                        spriteLayer.style.top = (frameY * data.scale.y) + 'px';
+                        spriteLayer.style.backgroundPosition = `-${fx * data.scale.x}px -${fy * data.scale.y}px`;
+                        spriteLayer.style.backgroundSize = `${fileObj.width * data.scale.x}px ${fileObj.height * data.scale.y}px`;
+                    } else {
+                        spriteLayer.style.width = '100%';
+                        spriteLayer.style.height = '100%';
+                        spriteLayer.style.backgroundSize = '100% 100%';
+                    }
+                }
+            }
         }
 
         function stopDrag() {
@@ -1618,8 +1696,11 @@
             const gv = document.getElementById('guide-v');
             if (gh) gh.style.display = 'none';
             if (gv) gv.style.display = 'none';
+            
+            // Recria todos os elementos e atualiza a barra lateral apenas quando o arrasto for concluído
             renderImages();
-            saveProject(); // Salva somente quando solta o mouse
+            updatePreview();
+            saveProject();
         }
 
         function resetProject() {
@@ -1831,7 +1912,10 @@
             const finalObj = { enableColorBackground: true, backgroundColor: document.getElementById('glob-bgColor').value, images: imagesData };
 
             // Injeta o JSON diretamente no script para não precisar de arquivo externo
-            const jsonStr = JSON.stringify(finalObj).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+            const jsonStr = JSON.stringify(finalObj)
+                .replace(/\\/g, "\\\\")
+                .replace(/'/g, "\\'")
+                .replace(/\$/g, "$$$$");
 
             const hxc = `// Advanced Custom Title - Feito Por TwGusta:
 // Editor Online: https://twgusta.github.io/fnfadvanced/
@@ -1885,10 +1969,30 @@ class AdvancedCustomTitle extends Module
         images = data.images;
     }
 
+    override function onCreate(event)
+    {
+        super.onCreate(event);
+        loadConfig();
+        state2 = FlxG.state;
+        added = false;
+        enterPlayed = false;
+        sprites = [];
+        baseX = []; baseY = []; baseScaleX = []; baseScaleY = []; imageData = [];
+    }
+
     override function onStateChangeEnd(event)
     {
         super.onStateChangeEnd(event);
         loadConfig();
+        
+        // Cancela todos os tweens dos sprites antigos para evitar memory leaks ou crashes
+        for (spr in sprites) {
+            if (spr != null) {
+                FlxTween.cancelTweensOf(spr);
+                FlxTween.cancelTweensOf(spr.scale);
+            }
+        }
+        
         state2 = event.targetState;
         added = false;
         enterPlayed = false;
@@ -1920,7 +2024,7 @@ class AdvancedCustomTitle extends Module
                 var modPath:String = "title/" + data.path;
                 
                 // Em Hscript/Psych, checamos a existência do asset para decidir o caminho
-                if (Assets.exists(Paths.image(modPath))) {
+                if (Assets.exists("images/" + modPath + ".png")) {
                     assetPath = modPath;
                 } else if (data.path == "logo") {
                     assetPath = "logoBumpin";
@@ -1973,7 +2077,7 @@ class AdvancedCustomTitle extends Module
                 
                 if (data.extras.pulse.enabled) {
                     if (data.extras.pulse.force) {
-                        startPulse(spr, sx, sy, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor);
+                        startPulse(spr, sx, sy, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor, true);
                     } else {
                         var delay:Float = 0.0;
                         if (data.start.slide.enabled && data.start.slide.duration > delay) delay = data.start.slide.duration;
@@ -1984,11 +2088,11 @@ class AdvancedCustomTitle extends Module
                                 if (data.type == "spritesheet" && data.start.animation.enabled) {
                                     // A lógica do onUpdate cuidará disso
                                 } else {
-                                    startPulse(spr, sx, sy, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor);
+                                    startPulse(spr, sx, sy, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor, false);
                                 }
                             });
                         } else if (data.type != "spritesheet" || !data.start.animation.enabled) {
-                            startPulse(spr, sx, sy, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor);
+                            startPulse(spr, sx, sy, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor, false);
                         }
                     }
                 }
@@ -2004,7 +2108,7 @@ class AdvancedCustomTitle extends Module
                 if (spr.animation.curAnim != null && spr.animation.curAnim.name == "start" && spr.animation.curAnim.finished) {
                     if (spr.animation.getByName("idle") != null) spr.animation.play("idle");
                     if (data.extras.pulse.enabled && !data.extras.pulse.force) {
-                        startPulse(spr, data.scale.x, data.scale.y, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor);
+                        startPulse(spr, data.scale.x, data.scale.y, data.extras.pulse.scale, data.extras.pulse.speed, data.extras.pulse.interval, getEase(data.extras.pulse.ease), data.extras.pulse.anchor, false);
                     }
                 }
             }
@@ -2036,12 +2140,18 @@ class AdvancedCustomTitle extends Module
             }
         }
     } // fecha onUpdate
-    function startPulse(spr:FlxSprite, baseSX:Float, baseSY:Float, amount:Float, speed:Float, interval:Float, ease:Dynamic, anchor:String)
+    function startPulse(spr:FlxSprite, baseSX:Float, baseSY:Float, amount:Float, speed:Float, interval:Float, ease:Dynamic, anchor:String, force:Bool)
     {
         var doPulse:Void->Void = null;
         doPulse = function() {
+            if (spr == null || !spr.active || spr.scale == null) return;
+            if (enterPlayed && !force) return;
             FlxTween.tween(spr.scale, { x: baseSX + amount, y: baseSY + amount }, speed, { ease: ease, onComplete: function(_) {
+                if (spr == null || !spr.active || spr.scale == null) return;
+                if (enterPlayed && !force) return;
                 FlxTween.tween(spr.scale, { x: baseSX, y: baseSY }, speed, { ease: ease, onComplete: function(_) {
+                    if (spr == null || !spr.active || spr.scale == null) return;
+                    if (enterPlayed && !force) return;
                     if (interval > 0) new FlxTimer().start(interval, function(_) { doPulse(); });
                     else doPulse();
                 }});
